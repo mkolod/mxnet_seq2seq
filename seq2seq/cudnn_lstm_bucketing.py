@@ -108,6 +108,8 @@ def get_data2(layout):
 
     train_iter = Seq2SeqIter(train_dataset, buckets=all_pairs, layout=layout)
     valid_iter = Seq2SeqIter(valid_dataset, buckets=all_pairs, layout=layout)
+    train_iter.reset()
+    valid_iter.reset()
 
     return train_iter, valid_iter, train_iter.src_vocab, train_iter.targ_vocab
 
@@ -130,13 +132,13 @@ def train(args):
 
     data_train, data_val, vocab, _ = get_data2('TN')
 
-    foo = data_train.next()
-    print("\n")
-    print(foo)
-    print(foo.data[0].asnumpy())
-    print("\n\n")
-    print(foo.label[0].asnumpy())
-    print(type(vocab))
+#    foo = data_train.next()
+#    print("\n")
+#    print(foo)
+#    print(foo.data[0].asnumpy())
+#    print("\n\n")
+#    print(foo.label[0].asnumpy())
+#    print(type(vocab))
 
     encoder = mx.rnn.SequentialRNNCell()
 
@@ -175,8 +177,12 @@ def train(args):
 
         # TODO: this should be a tuple to unpack
 #        enc_seq_len, dec_seq_len = seq_len
-        enc_seq_len = seq_len[0]
-        dec_seq_len = seq_len[1]
+        if isinstance(seq_len, int):
+            enc_seq_len = seq_len
+            dec_seq_len = seq_len
+        else:
+            enc_seq_len = seq_len[0]
+            dec_seq_len = seq_len[1]
 
         print("enc_seq_len: %d" % enc_seq_len)
         print("dec_seq_len: %d" % dec_seq_len)

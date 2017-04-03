@@ -100,9 +100,15 @@ class Seq2SeqIter(DataIter):
         self.num_buckets = len(self.bucket_idx_to_key)
         self.bucket_iterator_indices = list(range(self.num_buckets))
         self.default_bucket_key = self.sorted_keys[-1]
-        print(self.default_bucket_key) 
 
-
+        if self.major_axis == 0:
+            self.provide_data = [(data_name, (batch_size, self.default_bucket_key))]
+            self.provide_label = [(label_name, (batch_size, self.default_bucket_key))]
+        elif self.major_axis == 1:
+            self.provide_data = [(data_name, (self.default_bucket_key, batch_size))]
+            self.provide_label = [(label_name, (self.default_bucket_key, batch_size))]
+        else:
+            raise ValueError("Invalid layout %s: Must by NT (batch major) or TN (time major)")
     
     def bucketize(self):
         tuples = []
