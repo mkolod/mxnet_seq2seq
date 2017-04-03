@@ -88,7 +88,9 @@ class Seq2SeqIter(DataIter):
         self.pad_id = self.src_vocab['<PAD>']
         # After bucketization, we should probably del self.src_sent and self.targ_sent
         # to free up memory.
+        self.sorted_keys = None
         self.bucketed_data, self.bucket_idx_to_key = self.bucketize()
+        self.default_bucket_key = self.sorted_keys[-1]
         self.bucket_key_to_idx = invert_dict(dict(enumerate(self.bucket_idx_to_key)))
         self.interbucket_idx = -1
         self.curr_bucket_id = None
@@ -107,8 +109,8 @@ class Seq2SeqIter(DataIter):
             rev_src = src[::-1] 
             tuples.append((src, targ, len_tup))
             
-        sorted_tuples = sorted(tuples, key=operator.itemgetter(2))
-        grouped = groupby(sorted_tuples, lambda x: x[2])
+        self.sorted_keys = sorted(tuples, key=operator.itemgetter(2))
+        grouped = groupby(self.sorted_keys, lambda x: x[2])
         bucketed_data = [] 
         bucket_idx_to_key = []
         
