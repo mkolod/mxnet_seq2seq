@@ -45,13 +45,6 @@ def get_data(src_path, targ_path, start_label=1, invalid_label=0, pad_symbol='<P
         src_sent=src_sent, src_vocab=src_vocab, inv_src_vocab=inv_src_vocab,
         targ_sent=targ_sent, targ_vocab=targ_vocab, inv_targ_vocab=inv_targ_vocab)
 
-dataset = get_data(
-        src_path='./data/europarl-v7.es-en.en_small',
-        targ_path='./data/europarl-v7.es-en.es_small',
-        start_label=1,
-        invalid_label=0
-    )
-
 class Seq2SeqIter(DataIter):
 
     class TwoDBisect:
@@ -217,69 +210,67 @@ class Seq2SeqIter(DataIter):
                    (min_sent_len is None or i[0][1] >= min_sent_len)]
         return buckets
 
-def print_text(iterator, vocab, text, max_examples=10):
-    for i in range(min(max_examples, len(src))):
-        x = text[i]
-        s = []
-        for j in range(len(x)):
-            s.append(vocab[x[j]])
-        print(" ".join(s))
+def print_text(iterator, max_examples_per_bucket=1):
 
-print_text(i2, i2.inv_src_vocab, src)
+    inv_src_vocab = iterator.inv_src_vocab
+    inv_targ_vocab = iterator.inv_targ_vocab
 
-mx.nd.array(np.array([1,2,3]))
+    try:
+        while True:
+            data = iterator.next()
+            src_text = data.data[0].asnumpy()
+            targ_text = data.label[0].asnumpy()
+            src_vocab = iterator.src_vocab
+            targ_vocab = iterator.targ_vocab
+            inv_src_vocab = iterator.inv_src_vocab
+            inv_targ_vocab = iterator.inv_targ_vocab
 
-print_text(i2, i2.inv_targ_vocab, targ)
+            for i in range(min(max_examples_per_bucket, len(src_text))):
+                print("\n" + "-" * 40 + "\n")
+                source = src_text[i]
+                s = []
+                target = targ_text[i]
+                t = []
+                for j in range(len(source)):
+                    s.append(inv_src_vocab[int(source[j])])
+                print("source: %s" % " ".join(s))
+                for j in range(len(target)):
+                    t.append(inv_targ_vocab[int(target[j])])
+                print("\ntarget: %s" % " ".join(t))
+            
+    except StopIteration:
+        return
 
-# if __name__ == '__main__':
+if __name__ == '__main__':
 
-# Get rid of annoying Python deprecation warnings from built-in JSON encoder
-warnings.filterwarnings("ignore", category=DeprecationWarning)   
+    # Get rid of annoying Python deprecation warnings from built-in JSON encoder
+    warnings.filterwarnings("ignore", category=DeprecationWarning)   
 
-dataset = get_data(
-    src_path='./data/europarl-v7.es-en.en_small',
-    targ_path='./data/europarl-v7.es-en.es_small',
-    start_label=1,
-    invalid_label=0
-)
+    dataset = get_data(
+        src_path='./data/europarl-v7.es-en.en_train_small',
+        targ_path='./data/europarl-v7.es-en.es_train_small',
+        start_label=1,
+        invalid_label=0
+    )
 
-src_sent = dataset.src_sent
-targ_sent = dataset.targ_sent
+    src_sent = dataset.src_sent
+    targ_sent = dataset.targ_sent
 
-sent_len = lambda x: map(lambda y: len(y), x)
-max_len = lambda x: max(sent_len(x))
-min_len = lambda x: min(sent_len(x))
+    sent_len = lambda x: map(lambda y: len(y), x)
+    max_len = lambda x: max(sent_len(x))
+    min_len = lambda x: min(sent_len(x))
 
-min_len = min(min(sent_len(src_sent)), min(sent_len(targ_sent)))
+    min_len = min(min(sent_len(src_sent)), min(sent_len(targ_sent)))
 
-max_len = 65
-increment = 5
+    max_len = 65
+    increment = 5
 
-all_pairs = [(i, j) for i in xrange(
-        min_len,max_len+increment,increment
-    ) for j in xrange(
-        min_len,max_len+increment,increment
-    )]
+    all_pairs = [(i, j) for i in xrange(
+            min_len,max_len+increment,increment
+        ) for j in xrange(
+            min_len,max_len+increment,increment
+        )]
 
-i2 = Seq2SeqIter(dataset, buckets=all_pairs)
+    i1 = Seq2SeqIter(dataset, buckets=all_pairs)
 
-i2.bucketed_data
-
-narr = np.random.randn(5, 5)
-print(narr)
-marr = mx.nd.array(narr).asnumpy()
-print(marr)
-
-def print_text(iterator, vocab, text, max_examples=10):
-    for i in range(min(max_examples, len(src))):
-        x = text[i]
-        s = []
-        for j in range(len(x)):
-            s.append(vocab[x[j]])
-        print(" ".join(s))
-
-print_text(i2, i2.inv_src_vocab, src)
-
-mx.nd.array(np.array([1,2,3]))
-
-print_text(i2, i2.inv_targ_vocab, targ)
+    print_text(i1) 
