@@ -106,32 +106,19 @@ def get_data2(layout):
             min_len,max_len+increment,increment
         )]
 
-    train_iter = mx.rnn.BucketSentenceIter(train_dataset, buckets=all_pairs) #Seq2SeqIter(train_dataset, buckets=all_pairs)
-    valid_iter = mx.rnn.BucketSentenceIter(valid_dataset, buckets=all_pairs) #Seq2SeqIter(valid_dataset, buckets=all_pairs)
+    train_iter = Seq2SeqIter(train_dataset, buckets=all_pairs, layout=layout)
+    valid_iter = Seq2SeqIter(valid_dataset, buckets=all_pairs, layout=layout)
 
     return train_iter, valid_iter, train_iter.src_vocab, train_iter.targ_vocab
 
 def get_data(layout):
-    source_data = "./data/europarl-v7.es-en.es_train_small"  # ./data/ptb.train.txt
-    target_data = "./data/europarl-v7.es-en.en_train_small" # ./data/ptb.test.txt
+    source_data = "./data/europarl-v7.es-en.es_train_small"
+    target_data = "./data/europarl-v7.es-en.en_train_small"
     train_sent, vocab = tokenize_text(source_data, start_label=start_label,
                                       invalid_label=invalid_label)
     val_sent, _ = tokenize_text(target_data, vocab=None, start_label=start_label, # vocab, start_label=start_label,
                                 invalid_label=invalid_label)
   
-    # only keep sentences of the same length, until the dual-bucketing issue is resolved
-
-#    train_sent = train_sent[0:25000]
-#    val_sent = val_sent[0:25000]
-
-#    train_sent, val_sent = zip(*filter(lambda x: len(x[0]) == len(x[1]), zip(train_sent, val_sent)))
-
-
-    # input should be reversed - this is a pure side effect
-    # [i.reverse() for i in train_sent]
-
-#    data_train = 
-
     data_train  = mx.rnn.BucketSentenceIter(train_sent, args.batch_size, buckets=buckets,
                                             invalid_label=invalid_label, layout=layout)
     data_val    = mx.rnn.BucketSentenceIter(val_sent, args.batch_size, buckets=buckets,
@@ -140,9 +127,16 @@ def get_data(layout):
 
 
 def train(args):
-    data_train, data_val, vocab = get_data('TN')
 
-#    data_train, data_val, src_vocab, targ_vocab = get_data2('TN')
+    data_train, data_val, vocab, _ = get_data2('TN')
+
+    foo = data_train.next()
+    print("\n")
+    print(foo)
+    print(foo.data[0].asnumpy())
+    print("\n\n")
+    print(foo.label[0].asnumpy())
+    print(type(vocab))
 
     encoder = mx.rnn.SequentialRNNCell()
 
@@ -180,8 +174,12 @@ def train(args):
         decoder.reset()
 
         # TODO: this should be a tuple to unpack
-        enc_seq_len = seq_len
-        dec_seq_len = seq_len
+#        enc_seq_len, dec_seq_len = seq_len
+        enc_seq_len = seq_len[0]
+        dec_seq_len = seq_len[1]
+
+        print("enc_seq_len: %d" % enc_seq_len)
+        print("dec_seq_len: %d" % dec_seq_len)
 
         _, states = encoder.unroll(enc_seq_len, inputs=src_embed, layout='TNC')
         outputs, _ = decoder.unroll(dec_seq_len, inputs=targ_embed, begin_state=states, merge_outputs=True, layout='TNC')

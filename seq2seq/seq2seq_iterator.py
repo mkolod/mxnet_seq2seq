@@ -61,6 +61,7 @@ class Seq2SeqIter(DataIter):
     def __init__(
         self, dataset, buckets=None, batch_size=32, max_sent_len=None,
         data_name='data', label_name='softmax_label', dtype=np.int32, layout='NTC'):
+        self.major_axis = layout.find('N')
         self.data_name = data_name
         self.label_name = label_name
         self.dtype = dtype
@@ -90,7 +91,6 @@ class Seq2SeqIter(DataIter):
         # to free up memory.
         self.sorted_keys = None
         self.bucketed_data, self.bucket_idx_to_key = self.bucketize()
-        self.default_bucket_key = self.sorted_keys[-1][0]
         self.bucket_key_to_idx = invert_dict(dict(enumerate(self.bucket_idx_to_key)))
         self.interbucket_idx = -1
         self.curr_bucket_id = None
@@ -99,6 +99,9 @@ class Seq2SeqIter(DataIter):
         self.switch_bucket = True
         self.num_buckets = len(self.bucket_idx_to_key)
         self.bucket_iterator_indices = list(range(self.num_buckets))
+        self.default_bucket_key = self.sorted_keys[-1]
+        print(self.default_bucket_key) 
+
 
     
     def bucketize(self):
@@ -109,8 +112,9 @@ class Seq2SeqIter(DataIter):
             rev_src = src[::-1] 
             tuples.append((src, targ, len_tup))
             
-        self.sorted_keys = sorted(tuples, key=operator.itemgetter(2))
-        grouped = groupby(self.sorted_keys, lambda x: x[2])
+        sorted_keys = sorted(tuples, key=operator.itemgetter(2))
+        grouped = groupby(sorted_keys, lambda x: x[2])
+        self.sorted_keys = map(lambda x: x[2], sorted_keys)
         bucketed_data = [] 
         bucket_idx_to_key = []
         
@@ -174,9 +178,12 @@ class Seq2SeqIter(DataIter):
             current = self.curr_chunks.next()
             src_ex = ndarray.array(self.curr_buck[0][current])
             targ_ex = ndarray.array(self.curr_buck[1][current])
+            if self.major_axis:
+                src_ex = src_ex.T
+                targ_ex = targ_ex.T
             
             return DataBatch([src_ex], [targ_ex], pad=0,
-                             bucket_key=self.bucket_idx_to_key[self.curr_bucket_id],
+                             bucket_key=self.bucket_idx_to_key[self.curr_bucket_id][0],
                              provide_data=[(self.data_name, src_ex.shape)],
                              provide_label=[(self.label_name, targ_ex.shape)])
                 
