@@ -28,7 +28,7 @@ Dataset = namedtuple(
 def invert_dict(d):
     return {v: k for k, v in d.iteritems()}
 
-def get_data(src_path, targ_path, start_label=1, invalid_label=0, pad_symbol='<PAD>'):
+def get_s2s_data(src_path, targ_path, start_label=1, invalid_label=0, pad_symbol='<PAD>'):
     src_sent, src_vocab = tokenize_text(src_path, start_label=start_label,
                                 invalid_label=invalid_label)
     
@@ -246,7 +246,7 @@ if __name__ == '__main__':
     # Get rid of annoying Python deprecation warnings from built-in JSON encoder
     warnings.filterwarnings("ignore", category=DeprecationWarning)   
 
-    dataset = get_data(
+    dataset = get_s2s_data(
         src_path='./data/europarl-v7.es-en.en_train_small',
         targ_path='./data/europarl-v7.es-en.es_train_small',
         start_label=1,

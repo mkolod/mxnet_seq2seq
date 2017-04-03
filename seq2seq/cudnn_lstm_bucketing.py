@@ -5,6 +5,8 @@ import argparse
 import re
 from unidecode import unidecode
 
+from seq2seq_iterator import *
+
 parser = argparse.ArgumentParser(description="Train RNN on Penn Tree Bank",
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('--test', default=False, action='store_true',
@@ -70,9 +72,51 @@ def tokenize_text(fname, vocab=None, invalid_label=-1, start_label=0, sep_punctu
     sentences, vocab = mx.rnn.encode_sentences(lines, vocab=vocab, invalid_label=invalid_label, start_label=start_label)
     return sentences, vocab
 
+def get_data2(layout):
+
+    train_dataset = get_s2s_data(
+        src_path='./data/europarl-v7.es-en.en_train_small2',
+        targ_path='./data/europarl-v7.es-en.es_train_small2',
+        start_label=1,
+        invalid_label=0
+    )
+
+    valid_dataset = get_s2s_data(
+        src_path='./data/europarl-v7.es-en.en_valid_small2',
+        targ_path='./data/europarl-v7.es-en.es_valid_small2',
+        start_label=1,
+        invalid_label=0
+    )
+
+    train_src_sent = train_dataset.src_sent
+    train_targ_sent = train_dataset.targ_sent
+
+    sent_len = lambda x: map(lambda y: len(y), x)
+    max_len = lambda x: max(sent_len(x))
+    min_len = lambda x: min(sent_len(x))
+
+    min_len = min(min(sent_len(train_src_sent)), min(sent_len(train_targ_sent)))
+
+    max_len = 65
+    increment = 5
+
+    all_pairs = [(i, j) for i in xrange(
+            min_len,max_len+increment,increment
+        ) for j in xrange(
+            min_len,max_len+increment,increment
+        )]
+
+    train_iter = Seq2SeqIter(train_dataset, buckets=all_pairs)
+    valid_iter = Seq2SeqIter(valid_dataset, buckets=all_pairs)
+
+    return train_iter, valid_iter, train_iter.src_vocab, train_iter.targ_vocab
+
+    
+
+
 def get_data(layout):
-    source_data = "./data/europarl-v7.es-en.es_vsmall"  # ./data/ptb.train.txt
-    target_data = "./data/europarl-v7.es-en.en_vsmall" # ./data/ptb.test.txt
+    source_data = "./data/europarl-v7.es-en.es_train_small"  # ./data/ptb.train.txt
+    target_data = "./data/europarl-v7.es-en.en_train_small" # ./data/ptb.test.txt
     train_sent, vocab = tokenize_text(source_data, start_label=start_label,
                                       invalid_label=invalid_label)
     val_sent, _ = tokenize_text(target_data, vocab=None, start_label=start_label, # vocab, start_label=start_label,
@@ -89,6 +133,11 @@ def get_data(layout):
     # input should be reversed - this is a pure side effect
     # [i.reverse() for i in train_sent]
 
+#    data_train = 
+
+    foo = Seq2SeqIter(None)
+    print(foo)
+
     data_train  = mx.rnn.BucketSentenceIter(train_sent, args.batch_size, buckets=buckets,
                                             invalid_label=invalid_label, layout=layout)
     data_val    = mx.rnn.BucketSentenceIter(val_sent, args.batch_size, buckets=buckets,
@@ -97,18 +146,19 @@ def get_data(layout):
 
 
 def train(args):
-    data_train, data_val, vocab = get_data('TN')
+#    data_train, data_val, vocab = get_data('TN')
+    data_train, data_val, src_vocab, targ_vocab = get_data2('TN')
 
     encoder = mx.rnn.SequentialRNNCell()
 
-#    for i in range(args.num_layers):
-#        encoder.add(mx.rnn.LSTMCell(args.num_hidden, prefix='rnn_encoder%d_' % i))
-#        if i < args.num_layers - 1 and args.dropout > 0.0:
-#            encoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_encoder%d_' % i))
-#    encoder.add(mx.rnn.AttentionEncoderCell())
+    for i in range(args.num_layers):
+        encoder.add(mx.rnn.LSTMCell(args.num_hidden, prefix='rnn_encoder%d_' % i))
+        if i < args.num_layers - 1 and args.dropout > 0.0:
+            encoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_encoder%d_' % i))
+    encoder.add(mx.rnn.AttentionEncoderCell())
 
-    encoder = mx.rnn.FusedRNNCell(args.num_hidden, num_layers=args.num_layers, dropout=args.dropout,
-                                   mode='lstm', bidirectional=args.bidirectional)
+#    encoder = mx.rnn.FusedRNNCell(args.num_hidden, num_layers=args.num_layers, dropout=args.dropout,
+#                                   mode='lstm', bidirectional=args.bidirectional)
 
     decoder = mx.rnn.SequentialRNNCell()
     for i in range(args.num_layers):
@@ -126,7 +176,7 @@ def train(args):
     def sym_gen(seq_len):
         data = mx.sym.Variable('data')
         label = mx.sym.Variable('softmax_label')
-        embed = mx.sym.Embedding(data=data, input_dim=len(vocab),
+        embed = mx.sym.Embedding(data=data, input_dim=len(src_vocab),
                                  output_dim=args.num_embed, name='embed') #args.num_embed
 
         encoder.reset()
@@ -137,7 +187,7 @@ def train(args):
 
         pred = mx.sym.Reshape(outputs,
                 shape=(-1, args.num_hidden))
-        pred = mx.sym.FullyConnected(data=pred, num_hidden=len(vocab), name='pred')
+        pred = mx.sym.FullyConnected(data=pred, num_hidden=len(src_vocab), name='pred')
 
         label = mx.sym.Reshape(label, shape=(-1,))
 
