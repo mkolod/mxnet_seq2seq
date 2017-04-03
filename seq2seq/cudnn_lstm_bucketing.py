@@ -130,7 +130,7 @@ def get_data(layout):
 
 def train(args):
 
-    data_train, data_val, vocab, _ = get_data2('TN')
+    data_train, data_val, src_vocab, targ_vocab = get_data2('TN')
 
 #    foo = data_train.next()
 #    print("\n")
@@ -167,22 +167,16 @@ def train(args):
     def sym_gen(seq_len):
         data = mx.sym.Variable('data')
         label = mx.sym.Variable('softmax_label')
-        src_embed = mx.sym.Embedding(data=data, input_dim=len(vocab),
+        src_embed = mx.sym.Embedding(data=data, input_dim=len(src_vocab),
                                  output_dim=args.num_embed, name='src_embed') #args.num_embed
-        targ_embed = mx.sym.Embedding(data=label, input_dim=len(vocab),
+        targ_embed = mx.sym.Embedding(data=label, input_dim=len(targ_vocab),
                                  output_dim=args.num_embed, name='targ_embed')
 
         encoder.reset()
         decoder.reset()
 
-        # TODO: this should be a tuple to unpack
-#        enc_seq_len, dec_seq_len = seq_len
-        if isinstance(seq_len, int):
-            enc_seq_len = seq_len
-            dec_seq_len = seq_len
-        else:
-            enc_seq_len = seq_len[0]
-            dec_seq_len = seq_len[1]
+        enc_seq_len = seq_len[0]
+        dec_seq_len = seq_len[1]
 
         print("enc_seq_len: %d" % enc_seq_len)
         print("dec_seq_len: %d" % dec_seq_len)
@@ -192,7 +186,7 @@ def train(args):
 
         pred = mx.sym.Reshape(outputs,
                 shape=(-1, args.num_hidden))
-        pred = mx.sym.FullyConnected(data=pred, num_hidden=len(vocab), name='pred')
+        pred = mx.sym.FullyConnected(data=pred, num_hidden=len(targ_vocab), name='pred')
 
         label = mx.sym.Reshape(label, shape=(-1,))
 

@@ -100,6 +100,7 @@ class Seq2SeqIter(DataIter):
         self.num_buckets = len(self.bucket_idx_to_key)
         self.bucket_iterator_indices = list(range(self.num_buckets))
         self.default_bucket_key = self.sorted_keys[-1]
+        print("\n\n%s\n\n" % str(self.default_bucket_key))
 
         if self.major_axis == 0:
             self.provide_data = [(data_name, (batch_size, self.default_bucket_key))]
