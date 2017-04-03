@@ -106,13 +106,10 @@ def get_data2(layout):
             min_len,max_len+increment,increment
         )]
 
-    train_iter = Seq2SeqIter(train_dataset, buckets=all_pairs)
-    valid_iter = Seq2SeqIter(valid_dataset, buckets=all_pairs)
+    train_iter = mx.rnn.BucketSentenceIter(train_dataset, buckets=all_pairs) #Seq2SeqIter(train_dataset, buckets=all_pairs)
+    valid_iter = mx.rnn.BucketSentenceIter(valid_dataset, buckets=all_pairs) #Seq2SeqIter(valid_dataset, buckets=all_pairs)
 
     return train_iter, valid_iter, train_iter.src_vocab, train_iter.targ_vocab
-
-    
-
 
 def get_data(layout):
     source_data = "./data/europarl-v7.es-en.es_train_small"  # ./data/ptb.train.txt
@@ -135,9 +132,6 @@ def get_data(layout):
 
 #    data_train = 
 
-    foo = Seq2SeqIter(None)
-    print(foo)
-
     data_train  = mx.rnn.BucketSentenceIter(train_sent, args.batch_size, buckets=buckets,
                                             invalid_label=invalid_label, layout=layout)
     data_val    = mx.rnn.BucketSentenceIter(val_sent, args.batch_size, buckets=buckets,
@@ -146,8 +140,9 @@ def get_data(layout):
 
 
 def train(args):
-#    data_train, data_val, vocab = get_data('TN')
-    data_train, data_val, src_vocab, targ_vocab = get_data2('TN')
+    data_train, data_val, vocab = get_data('TN')
+
+#    data_train, data_val, src_vocab, targ_vocab = get_data2('TN')
 
     encoder = mx.rnn.SequentialRNNCell()
 
@@ -176,18 +171,24 @@ def train(args):
     def sym_gen(seq_len):
         data = mx.sym.Variable('data')
         label = mx.sym.Variable('softmax_label')
-        embed = mx.sym.Embedding(data=data, input_dim=len(src_vocab),
-                                 output_dim=args.num_embed, name='embed') #args.num_embed
+        src_embed = mx.sym.Embedding(data=data, input_dim=len(vocab),
+                                 output_dim=args.num_embed, name='src_embed') #args.num_embed
+        targ_embed = mx.sym.Embedding(data=label, input_dim=len(vocab),
+                                 output_dim=args.num_embed, name='targ_embed')
 
         encoder.reset()
         decoder.reset()
 
-        _, states = encoder.unroll(seq_len, inputs=embed, layout='TNC')
-        outputs, _ = decoder.unroll(seq_len, inputs=embed, begin_state=states, merge_outputs=True, layout='TNC')
+        # TODO: this should be a tuple to unpack
+        enc_seq_len = seq_len
+        dec_seq_len = seq_len
+
+        _, states = encoder.unroll(enc_seq_len, inputs=src_embed, layout='TNC')
+        outputs, _ = decoder.unroll(dec_seq_len, inputs=targ_embed, begin_state=states, merge_outputs=True, layout='TNC')
 
         pred = mx.sym.Reshape(outputs,
                 shape=(-1, args.num_hidden))
-        pred = mx.sym.FullyConnected(data=pred, num_hidden=len(src_vocab), name='pred')
+        pred = mx.sym.FullyConnected(data=pred, num_hidden=len(vocab), name='pred')
 
         label = mx.sym.Reshape(label, shape=(-1,))
 

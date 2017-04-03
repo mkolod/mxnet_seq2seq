@@ -90,7 +90,7 @@ class Seq2SeqIter(DataIter):
         # to free up memory.
         self.sorted_keys = None
         self.bucketed_data, self.bucket_idx_to_key = self.bucketize()
-        self.default_bucket_key = self.sorted_keys[-1]
+        self.default_bucket_key = self.sorted_keys[-1][0]
         self.bucket_key_to_idx = invert_dict(dict(enumerate(self.bucket_idx_to_key)))
         self.interbucket_idx = -1
         self.curr_bucket_id = None
