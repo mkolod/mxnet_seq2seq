@@ -14,8 +14,6 @@ import pickle
 import re
 import warnings
 
-# from common import tokenize_text, invert_dict
-
 class Seq2SeqIter(DataIter):
 
     class TwoDBisect:
@@ -31,7 +29,7 @@ class Seq2SeqIter(DataIter):
     
     def __init__(
         self, dataset, buckets=None, batch_size=32, max_sent_len=None,
-        data_name='data', label_name='softmax_label', dtype=np.int32, layout='NTC'):
+        data_name='data', label_name='softmax_label', dtype=np.int32, layout='TNC'):
         self.major_axis = layout.find('N')
         self.data_name = data_name
         self.label_name = label_name
@@ -73,7 +71,7 @@ class Seq2SeqIter(DataIter):
         self.default_bucket_key = self.sorted_keys[-1]
 
         if self.major_axis == 0:
-            self.provide_data = [(data_name, (batch_size, self.default_bucket_ke[0]))]
+            self.provide_data = [(data_name, (batch_size, self.default_bucket_key[0]))]
             self.provide_label = [(label_name, (batch_size, self.default_bucket_key[1]))]
         elif self.major_axis == 1:
             self.provide_data = [(data_name, (self.default_bucket_key[0], batch_size))]
@@ -159,12 +157,10 @@ class Seq2SeqIter(DataIter):
                 src_ex = src_ex.T
                 targ_ex = targ_ex.T
 
-#            print("foo = %s" % str(self.bucket_idx_to_key[self.curr_bucket_id][0]))
-           
             return DataBatch([src_ex], [targ_ex], pad=0,
                              bucket_key=self.bucket_idx_to_key[self.curr_bucket_id],
-                             provide_data=[(self.data_name, src_ex.shape)],
-                             provide_label=[(self.label_name, targ_ex.shape)])
+                             provide_data=[(self.data_name, src_ex.shape)], # (src_ex.shape[1], src_ex.shape[0]))],
+                             provide_label=[(self.label_name, targ_ex.shape)]) # (targ_ex.shape[1], targ_ex.shape[0]))])
                 
         except StopIteration as si:
             if self.interbucket_idx == self.num_buckets - 1:

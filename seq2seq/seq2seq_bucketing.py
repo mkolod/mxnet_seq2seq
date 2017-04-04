@@ -97,8 +97,8 @@ def get_data2(layout):
             min_len,max_len+increment,increment
         )]
 
-    train_iter = Seq2SeqIter(train_dataset, buckets=all_pairs, layout=layout)
-    valid_iter = Seq2SeqIter(valid_dataset, buckets=all_pairs, layout=layout)
+    train_iter = Seq2SeqIter(train_dataset, buckets=all_pairs, layout=layout, batch_size=args.batch_size)
+    valid_iter = Seq2SeqIter(valid_dataset, buckets=all_pairs, layout=layout, batch_size=args.batch_size)
     train_iter.reset()
     valid_iter.reset()
 
@@ -121,7 +121,7 @@ def get_data(layout):
 
 def train(args):
 
-    data_train, data_val, src_vocab, targ_vocab = get_data2('TN')
+    data_train, data_val, src_vocab, targ_vocab = get_data2('TN') # NT
 
     encoder = mx.rnn.SequentialRNNCell()
 
@@ -152,8 +152,9 @@ def train(args):
         enc_seq_len = seq_len[0]
         dec_seq_len = seq_len[1]
 
-        _, states = encoder.unroll(enc_seq_len, inputs=src_embed, layout='TNC')
-        outputs, _ = decoder.unroll(dec_seq_len, inputs=targ_embed, begin_state=states, merge_outputs=True, layout='TNC')
+        layout = 'TNC'
+        _, states = encoder.unroll(enc_seq_len, inputs=src_embed, layout=layout)
+        outputs, _ = decoder.unroll(dec_seq_len, inputs=targ_embed, begin_state=states, merge_outputs=True, layout=layout)
 
         pred = mx.sym.Reshape(outputs,
                 shape=(-1, args.num_hidden))
