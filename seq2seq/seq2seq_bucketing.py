@@ -7,6 +7,8 @@ from unidecode import unidecode
 
 from seq2seq_iterator import *
 
+from attention_cell import AttentionEncoderCell, DotAttentionCell
+
 parser = argparse.ArgumentParser(description="Train RNN on Penn Tree Bank",
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('--test', default=False, action='store_true',
@@ -138,14 +140,14 @@ def train(args):
         encoder.add(mx.rnn.LSTMCell(args.num_hidden, prefix='rnn_encoder%d_' % i))
         if i < args.num_layers - 1 and args.dropout > 0.0:
             encoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_encoder%d_' % i))
-    encoder.add(mx.rnn.AttentionEncoderCell())
+    encoder.add(AttentionEncoderCell())
 
     decoder = mx.rnn.SequentialRNNCell()
     for i in range(args.num_layers):
         decoder.add(mx.rnn.LSTMCell(args.num_hidden, prefix=('rnn_decoder%d_' % i)))
         if i < args.num_layers - 1 and args.dropout > 0.0:
             decoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_decoder%d_' % i))
-    decoder.add(mx.rnn.DotAttentionCell())
+    decoder.add(DotAttentionCell())
 
     def sym_gen(seq_len):
         data = mx.sym.Variable('data')
