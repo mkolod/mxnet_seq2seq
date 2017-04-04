@@ -70,11 +70,11 @@ class Seq2SeqIter(DataIter):
         self.default_bucket_key = self.sorted_keys[-1]
 
         if self.layout == 'TN':
-            self.provide_data = [mx.io.DataDesc(data_name, (self.default_bucket_key[0], self.batch_size), layout='TN')]
-            self.provide_label = [mx.io.DataDesc(label_name, (self.default_bucket_key[1], batch_size), layout='TN')] 
+            self.provide_data = [mx.io.DataDesc(self.data_name, (self.default_bucket_key[0], self.batch_size), layout='TN')]
+            self.provide_label = [mx.io.DataDesc(self.label_name, (self.default_bucket_key[1], batch_size), layout='TN')] 
         elif self.layout == 'NT':
-            self.provide_data = [(data_name, (self.batch_size, self.default_bucket_key[0]))]
-            self.provide_label = [(label_name, (self.batch_size, self.default_bucket_key[1]))]
+            self.provide_data = [(self.data_name, (self.batch_size, self.default_bucket_key[0]))]
+            self.provide_label = [(self.label_name, (self.batch_size, self.default_bucket_key[1]))]
         else:
             raise ValueError("Invalid layout %s: Must by NT (batch major) or TN (time major)")
     
@@ -152,16 +152,13 @@ class Seq2SeqIter(DataIter):
             current = self.curr_chunks.next()
             src_ex = ndarray.array(self.curr_buck[0][current])
             targ_ex = ndarray.array(self.curr_buck[1][current])
-#            if self.layout == 'TN':
-#                src_ex = src_ex.T
-#                targ_ex = targ_ex.T
 
             if self.layout == 'TN':
-                provide_data = [mx.io.DataDesc(data_name, (src_ex.shape, self.batch_size), layout='TN')]
-                provide_label = [mx.io.DataDesc(label_name, (targ_ex.shape, self.batch_size), layout='TN')] 
+                provide_data = [mx.io.DataDesc(self.data_name, (src_ex.shape, self.batch_size), layout='TN')]
+                provide_label = [mx.io.DataDesc(self.label_name, (targ_ex.shape, self.batch_size), layout='TN')] 
             elif self.layout == 'NT':
-                provide_data = [(data_name, (self.batch_size, batch_size, src_ex.shape))]
-                provide_label = [(label_name, (srlf.batch_size, targ_ex.shape))]
+                provide_data = [(self.data_name, (self.batch_size, batch_size, src_ex.shape))]
+                provide_label = [(self.label_name, (srlf.batch_size, targ_ex.shape))]
             else:
                 raise Exception("Layout must be 'TN' or 'NT'") 
 
