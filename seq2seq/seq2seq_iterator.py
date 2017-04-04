@@ -161,7 +161,7 @@ class Seq2SeqIter(DataIter):
                 provide_data = [mx.io.DataDesc(self.data_name, (src_ex.shape, self.batch_size), layout='TN')]
                 provide_label = [mx.io.DataDesc(self.label_name, (targ_ex.shape, self.batch_size), layout='TN')] 
             elif self.layout == 'NT':
-                provide_data = [(self.data_name, (self.batch_size, batch_size, src_ex.shape))]
+                provide_data = [(self.data_name, (self.batch_size, src_ex.shape))]
                 provide_label = [(self.label_name, (self.batch_size, targ_ex.shape))]
             else:
                 raise Exception("Layout must be 'TN' or 'NT'") 

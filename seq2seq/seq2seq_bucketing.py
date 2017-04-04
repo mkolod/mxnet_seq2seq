@@ -142,7 +142,7 @@ def train(args):
         data = mx.sym.Variable('data')
         label = mx.sym.Variable('softmax_label')
         src_embed = mx.sym.Embedding(data=data, input_dim=len(src_vocab),
-                                 output_dim=args.num_embed, name='src_embed') #args.num_embed
+                                 output_dim=args.num_embed, name='src_embed') 
         targ_embed = mx.sym.Embedding(data=label, input_dim=len(targ_vocab),
                                  output_dim=args.num_embed, name='targ_embed')
 
@@ -154,9 +154,9 @@ def train(args):
         layout = 'TNC'
         _, states = encoder.unroll(enc_seq_len, inputs=src_embed, layout=layout)
 
-        print("\n\nstates: %s\n\n" % dir(states[0]))
+        print("\n\nstates: %s\n\n" % dir(states))
 
-        outputs, _ = decoder.unroll(dec_seq_len, inputs=targ_embed, begin_state=states, merge_outputs=True, layout=layout) # states
+        outputs, _ = decoder.unroll(dec_seq_len, inputs=targ_embed, begin_state=None, merge_outputs=True, layout=layout) # begin_state=states
 
         pred = mx.sym.Reshape(outputs,
                 shape=(-1, args.num_hidden))
