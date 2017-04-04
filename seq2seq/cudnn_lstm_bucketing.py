@@ -178,8 +178,8 @@ def train(args):
         enc_seq_len = seq_len[0]
         dec_seq_len = seq_len[1]
 
-        print("enc_seq_len: %d" % enc_seq_len)
-        print("dec_seq_len: %d" % dec_seq_len)
+        print("enc_seq_len: %d" % int(enc_seq_len))
+        print("dec_seq_len: %d" % int(dec_seq_len))
 
         _, states = encoder.unroll(enc_seq_len, inputs=src_embed, layout='TNC')
         outputs, _ = decoder.unroll(dec_seq_len, inputs=targ_embed, begin_state=states, merge_outputs=True, layout='TNC')
@@ -199,6 +199,8 @@ def train(args):
         contexts = [mx.gpu(int(i)) for i in args.gpus.split(',')]
     else:
         contexts = mx.cpu(0)
+
+    print("foo: %s" % str(data_train.default_bucket_key))
  
     model = mx.mod.BucketingModule(
         sym_gen             = sym_gen,

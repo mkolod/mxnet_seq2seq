@@ -103,11 +103,11 @@ class Seq2SeqIter(DataIter):
         print("\n\n%s\n\n" % str(self.default_bucket_key))
 
         if self.major_axis == 0:
-            self.provide_data = [(data_name, (batch_size, self.default_bucket_key))]
-            self.provide_label = [(label_name, (batch_size, self.default_bucket_key))]
+            self.provide_data = [(data_name, (batch_size, self.default_bucket_key[0]))]
+            self.provide_label = [(label_name, (batch_size, self.default_bucket_key[1]))]
         elif self.major_axis == 1:
-            self.provide_data = [(data_name, (self.default_bucket_key, batch_size))]
-            self.provide_label = [(label_name, (self.default_bucket_key, batch_size))]
+            self.provide_data = [(data_name, (self.default_bucket_key[0], batch_size))]
+            self.provide_label = [(label_name, (self.default_bucket_key[0], self.default_bucket_key[1]), batch_size)]
         else:
             raise ValueError("Invalid layout %s: Must by NT (batch major) or TN (time major)")
     
@@ -188,7 +188,10 @@ class Seq2SeqIter(DataIter):
             if self.major_axis:
                 src_ex = src_ex.T
                 targ_ex = targ_ex.T
-            
+           
+            print("bucket_idx_to_key[bucket_id] = %s" % str(self.bucket_idx_to_key[self.curr_bucket_id][0])) 
+            print("src_shape = %s" % str(src_ex.shape))
+            print("targ_shape = %s" % str(targ_ex.shape))
             return DataBatch([src_ex], [targ_ex], pad=0,
                              bucket_key=self.bucket_idx_to_key[self.curr_bucket_id][0],
                              provide_data=[(self.data_name, src_ex.shape)],
