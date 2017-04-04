@@ -5,6 +5,8 @@ import argparse
 import re
 from unidecode import unidecode
 
+from common import tokenize_text
+
 from seq2seq_iterator import *
 
 from attention_cell import AttentionEncoderCell, DotAttentionCell
@@ -60,19 +62,6 @@ buckets = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
 
 start_label = 1
 invalid_label = 0
-
-#def tokenize_text(fname, vocab=None, invalid_label=-1, start_label=0):
-#    lines = open(fname).readlines()
-#    lines = [filter(None, i.split(' ')) for i in lines]
-#    sentences, vocab = mx.rnn.encode_sentences(lines, vocab=vocab, invalid_label=invalid_label, start_label=start_label)
-#    return sentences, vocab
-
-def tokenize_text(fname, vocab=None, invalid_label=-1, start_label=0, sep_punctuation=True):
-    lines = unidecode(open(fname).read().decode('utf-8')).split('\n')
-    lines = [x for x in lines if x]
-    lines = map(lambda x: re.findall(r"\w+|[^\w\s]", x, re.UNICODE), lines)    
-    sentences, vocab = mx.rnn.encode_sentences(lines, vocab=vocab, invalid_label=invalid_label, start_label=start_label)
-    return sentences, vocab
 
 def get_data2(layout):
 

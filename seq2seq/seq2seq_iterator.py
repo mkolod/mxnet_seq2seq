@@ -7,43 +7,20 @@ from mxnet.io import DataBatch, DataIter
 from random import shuffle
 from mxnet import ndarray
 
+from common import tokenize_text, invert_dict
+
 import operator
 import pickle
 import re
 import warnings
 
-# Decode text as UTF-8
-# Remove diacritical signs and convert to Latin alphabet
-# Separate punctuation as separate "words"
-def tokenize_text(fname, vocab=None, invalid_label=0, start_label=1, sep_punctuation=True):
-    lines = unidecode(open(fname).read().decode('utf-8')).split('\n')
-    lines = map(lambda x: re.findall(r"\w+|[^\w\s]", x, re.UNICODE), lines)    
-    sentences, vocab = mx.rnn.encode_sentences(lines, vocab=vocab, invalid_label=invalid_label, start_label=start_label)
-    return sentences, vocab
+from collections import namedtuple 
 
 Dataset = namedtuple(
-    'Dataset', 
+    'Dataset',
     ['src_sent', 'src_vocab', 'inv_src_vocab', 'targ_sent', 'targ_vocab', 'inv_targ_vocab'])
 
-def invert_dict(d):
-    return {v: k for k, v in d.iteritems()}
-
-def get_s2s_data(src_path, targ_path, start_label=1, invalid_label=0, pad_symbol='<PAD>'):
-    src_sent, src_vocab = tokenize_text(src_path, start_label=start_label,
-                                invalid_label=invalid_label)
-    
-    src_vocab[pad_symbol] = invalid_label
-    inv_src_vocab = invert_dict(src_vocab)
-
-    targ_sent, targ_vocab = tokenize_text(targ_path, start_label=start_label, #new_start+1,
-                                          invalid_label=invalid_label)
-    
-    targ_vocab[pad_symbol] = invalid_label
-    inv_targ_vocab = invert_dict(targ_vocab)
-    
-    return Dataset(
-        src_sent=src_sent, src_vocab=src_vocab, inv_src_vocab=inv_src_vocab,
-        targ_sent=targ_sent, targ_vocab=targ_vocab, inv_targ_vocab=inv_targ_vocab)
+# from common import tokenize_text, invert_dict
 
 class Seq2SeqIter(DataIter):
 
@@ -188,9 +165,6 @@ class Seq2SeqIter(DataIter):
                 src_ex = src_ex.T
                 targ_ex = targ_ex.T
            
-            print("bucket_idx_to_key[bucket_id] = %s" % str(self.bucket_idx_to_key[self.curr_bucket_id][0])) 
-            print("src_shape = %s" % str(src_ex.shape))
-            print("targ_shape = %s" % str(targ_ex.shape))
             return DataBatch([src_ex], [targ_ex], pad=0,
                              bucket_key=self.bucket_idx_to_key[self.curr_bucket_id][0],
                              provide_data=[(self.data_name, src_ex.shape)],
@@ -260,6 +234,25 @@ def print_text(iterator, max_examples_per_bucket=1):
         return
 
 if __name__ == '__main__':
+
+    def get_s2s_data(src_path, targ_path, start_label=1, invalid_label=0, pad_symbol='<PAD>'):
+        src_sent, src_vocab = tokenize_text(src_path, start_label=start_label,
+                                    invalid_label=invalid_label)
+        
+        src_vocab[pad_symbol] = invalid_label
+        inv_src_vocab = invert_dict(src_vocab)
+
+        targ_sent, targ_vocab = tokenize_text(targ_path, start_label=start_label, #new_start+1,
+                                              invalid_label=invalid_label)
+        
+        targ_vocab[pad_symbol] = invalid_label
+        inv_targ_vocab = invert_dict(targ_vocab)
+        
+        return Dataset(
+            src_sent=src_sent, src_vocab=src_vocab, inv_src_vocab=inv_src_vocab,
+            targ_sent=targ_sent, targ_vocab=targ_vocab, inv_targ_vocab=inv_targ_vocab)
+
+
 
     # Get rid of annoying Python deprecation warnings from built-in JSON encoder
     warnings.filterwarnings("ignore", category=DeprecationWarning)   
