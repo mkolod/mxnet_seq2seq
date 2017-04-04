@@ -71,7 +71,7 @@ class Seq2SeqIter(DataIter):
 
         if self.layout == 'TN':
             self.provide_data = [mx.io.DataDesc(self.data_name, (self.default_bucket_key[0], self.batch_size), layout='TN')]
-            self.provide_label = [mx.io.DataDesc(self.label_name, (self.default_bucket_key[1], batch_size), layout='TN')] 
+            self.provide_label = [mx.io.DataDesc(self.label_name, (self.default_bucket_key[1], self.batch_size), layout='TN')] 
         elif self.layout == 'NT':
             self.provide_data = [(self.data_name, (self.batch_size, self.default_bucket_key[0]))]
             self.provide_label = [(self.label_name, (self.batch_size, self.default_bucket_key[1]))]
@@ -158,7 +158,7 @@ class Seq2SeqIter(DataIter):
                 provide_label = [mx.io.DataDesc(self.label_name, (targ_ex.shape, self.batch_size), layout='TN')] 
             elif self.layout == 'NT':
                 provide_data = [(self.data_name, (self.batch_size, batch_size, src_ex.shape))]
-                provide_label = [(self.label_name, (srlf.batch_size, targ_ex.shape))]
+                provide_label = [(self.label_name, (self.batch_size, targ_ex.shape))]
             else:
                 raise Exception("Layout must be 'TN' or 'NT'") 
 
