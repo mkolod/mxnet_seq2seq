@@ -156,7 +156,7 @@ def train(args):
 
         print("\n\nstates: %s\n\n" % dir(states[0]))
 
-        outputs, _ = decoder.unroll(enc_seq_len, inputs=src_embed, begin_state=states, merge_outputs=True, layout=layout) # states
+        outputs, _ = decoder.unroll(dec_seq_len, inputs=targ_embed, begin_state=states, merge_outputs=True, layout=layout) # states
 
         pred = mx.sym.Reshape(outputs,
                 shape=(-1, args.num_hidden))

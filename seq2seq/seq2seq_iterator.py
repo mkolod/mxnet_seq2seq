@@ -154,6 +154,10 @@ class Seq2SeqIter(DataIter):
             targ_ex = ndarray.array(self.curr_buck[1][current])
 
             if self.layout == 'TN':
+                src_ex = src_ex.T
+                targ_ex = targ_ex.T
+
+            if self.layout == 'TN':
                 provide_data = [mx.io.DataDesc(self.data_name, (src_ex.shape, self.batch_size), layout='TN')]
                 provide_label = [mx.io.DataDesc(self.label_name, (targ_ex.shape, self.batch_size), layout='TN')] 
             elif self.layout == 'NT':
