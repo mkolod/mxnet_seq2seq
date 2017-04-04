@@ -132,14 +132,6 @@ def train(args):
 
     data_train, data_val, src_vocab, targ_vocab = get_data2('TN')
 
-#    foo = data_train.next()
-#    print("\n")
-#    print(foo)
-#    print(foo.data[0].asnumpy())
-#    print("\n\n")
-#    print(foo.label[0].asnumpy())
-#    print(type(vocab))
-
     encoder = mx.rnn.SequentialRNNCell()
 
     for i in range(args.num_layers):
@@ -148,21 +140,12 @@ def train(args):
             encoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_encoder%d_' % i))
     encoder.add(mx.rnn.AttentionEncoderCell())
 
-#    encoder = mx.rnn.FusedRNNCell(args.num_hidden, num_layers=args.num_layers, dropout=args.dropout,
-#                                   mode='lstm', bidirectional=args.bidirectional)
-
     decoder = mx.rnn.SequentialRNNCell()
     for i in range(args.num_layers):
         decoder.add(mx.rnn.LSTMCell(args.num_hidden, prefix=('rnn_decoder%d_' % i)))
         if i < args.num_layers - 1 and args.dropout > 0.0:
             decoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_decoder%d_' % i))
     decoder.add(mx.rnn.DotAttentionCell())
-
-#    encoder_data = mx.sym.Variable('encoder_data')
-#    decoder_data = mx.sym.Variable('decoder_data')
-
-    # assert outputs.list_outputs() == ['rnn_stack4_t0_out_output', 'rnn_stack4_t1_out_output', 'rnn_stack4_t2_out_output']
-    # args, outs, auxs = outputs.infer_shape(encoder_data=(10, 3, 50), decoder_data=(10, 3, 50))
 
     def sym_gen(seq_len):
         data = mx.sym.Variable('data')
@@ -177,9 +160,6 @@ def train(args):
 
         enc_seq_len = seq_len[0]
         dec_seq_len = seq_len[1]
-
-        print("enc_seq_len: %d" % int(enc_seq_len))
-        print("dec_seq_len: %d" % int(dec_seq_len))
 
         _, states = encoder.unroll(enc_seq_len, inputs=src_embed, layout='TNC')
         outputs, _ = decoder.unroll(dec_seq_len, inputs=targ_embed, begin_state=states, merge_outputs=True, layout='TNC')
@@ -200,8 +180,6 @@ def train(args):
     else:
         contexts = mx.cpu(0)
 
-    print("foo: %s" % str(data_train.default_bucket_key))
- 
     model = mx.mod.BucketingModule(
         sym_gen             = sym_gen,
         default_bucket_key  = data_train.default_bucket_key,
