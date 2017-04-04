@@ -171,6 +171,8 @@ def train(args):
     else:
         contexts = mx.cpu(0)
 
+    print("default bucket key: %s" % str(data_train.default_bucket_key))
+
     model = mx.mod.BucketingModule(
         sym_gen             = sym_gen,
         default_bucket_key  = data_train.default_bucket_key,

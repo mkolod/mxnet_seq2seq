@@ -73,7 +73,7 @@ class Seq2SeqIter(DataIter):
         self.default_bucket_key = self.sorted_keys[-1]
 
         if self.major_axis == 0:
-            self.provide_data = [(data_name, (batch_size, self.default_bucket_key[0]))]
+            self.provide_data = [(data_name, (batch_size, self.default_bucket_ke[0]))]
             self.provide_label = [(label_name, (batch_size, self.default_bucket_key[1]))]
         elif self.major_axis == 1:
             self.provide_data = [(data_name, (self.default_bucket_key[0], batch_size))]
@@ -158,9 +158,11 @@ class Seq2SeqIter(DataIter):
             if self.major_axis:
                 src_ex = src_ex.T
                 targ_ex = targ_ex.T
+
+#            print("foo = %s" % str(self.bucket_idx_to_key[self.curr_bucket_id][0]))
            
             return DataBatch([src_ex], [targ_ex], pad=0,
-                             bucket_key=self.bucket_idx_to_key[self.curr_bucket_id][0],
+                             bucket_key=self.bucket_idx_to_key[self.curr_bucket_id],
                              provide_data=[(self.data_name, src_ex.shape)],
                              provide_label=[(self.label_name, targ_ex.shape)])
                 
