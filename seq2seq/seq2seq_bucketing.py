@@ -166,8 +166,10 @@ def train(args):
 #        print(dir(pred))
 #        print(pred.infer_shape_partial())
 
-        pred = mx.sym.Reshape(pred, shape=(enc_seq_len, 32, args.num_hidden))
+#        pred = mx.sym.Reshape(pred, shape=(enc_seq_len, 32, args.num_hidden))
  #       label = mx.sym.Reshape(label, shape=(enc_seq_len, 32))
+        pred = mx.sym.Reshape(data=pred, shape=(-1,))
+        label = mx.sym.Reshape(data=label, shape=(-1,))
 
         pred = mx.sym.SoftmaxOutput(data=pred, label=label, name='softmax')
 
