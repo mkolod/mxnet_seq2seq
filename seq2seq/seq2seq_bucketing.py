@@ -114,7 +114,7 @@ def get_data(layout):
                                       invalid_label=invalid_label)
     val_sent, _ = tokenize_text(target_data, vocab=None, start_label=start_label, # vocab, start_label=start_label,
                                 invalid_label=invalid_label)
-  
+ 
     data_train  = mx.rnn.BucketSentenceIter(train_sent, args.batch_size, buckets=buckets,
                                             invalid_label=invalid_label, layout=layout)
     data_val    = mx.rnn.BucketSentenceIter(val_sent, args.batch_size, buckets=buckets,
@@ -122,6 +122,7 @@ def get_data(layout):
     return data_train, data_val, vocab
 
 
+# WORK IN PROGRESS !!!
 def decoder_unroll(decoder_sym, targ_dict, inputs, begin_state=None, layout='NTC', merge_outputs=None):
 
         go_symbol = targ_dict['<GO>']
@@ -146,7 +147,9 @@ def decoder_unroll(decoder_sym, targ_dict, inputs, begin_state=None, layout='NTC
 
 def train(args):
 
-    data_train, data_val, src_vocab, targ_vocab = get_data2('TN')
+    # data_train, data_val, src_vocab, targ_vocab = get_data2('TN')
+    data_train, data_val, src_vocab = get_data('TN')
+    targ_vocab = src_vocab
 
     encoder = mx.rnn.SequentialRNNCell()
 
@@ -174,7 +177,9 @@ def train(args):
         encoder.reset()
         decoder.reset()
 
-        enc_seq_len, dec_seq_len = seq_len
+        enc_seq_len = seq_len
+        dec_seq_len = seq_len
+#        enc_seq_len, dec_seq_len = seq_len
 
         layout = 'TNC'
         _, states = encoder.unroll(enc_seq_len, inputs=src_embed, layout=layout)
@@ -190,7 +195,7 @@ def train(args):
 
 #        pred = mx.sym.Reshape(pred, shape=(enc_seq_len, 32, args.num_hidden))
  #       label = mx.sym.Reshape(label, shape=(enc_seq_len, 32))
-        pred = mx.sym.Reshape(data=pred, shape=(-1,))
+#        pred = mx.sym.Reshape(data=pred, shape=(-1,))
         label = mx.sym.Reshape(data=label, shape=(-1,))
 
         pred = mx.sym.SoftmaxOutput(data=pred, label=label, name='softmax')
