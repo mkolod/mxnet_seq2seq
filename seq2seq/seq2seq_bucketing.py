@@ -122,6 +122,28 @@ def get_data(layout):
     return data_train, data_val, vocab
 
 
+def decoder_unroll(decoder_sym, targ_dict, inputs, begin_state=None, layout='NTC', merge_outputs=None):
+
+        go_symbol = targ_dict['<GO>']
+
+        # What does this do?
+        inputs, _ = _normalize_sequence(length, inputs, layout, False)
+       
+        # Fix this since it's not a class method anymore
+        if begin_state is None:
+            begin_state = self.begin_state()
+
+        states = begin_state
+        outputs = []
+        for i in range(length):
+            output, states = self(inputs[i], states)
+            outputs.append(output)
+
+        # What does this do?
+        outputs, _ = _normalize_sequence(length, outputs, layout, merge_outputs)
+
+        return outputs, states
+
 def train(args):
 
     data_train, data_val, src_vocab, targ_vocab = get_data2('TN')
