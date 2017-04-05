@@ -204,7 +204,7 @@ class Seq2SeqIter(DataIter):
                    (min_sent_len is None or i[0][1] >= min_sent_len)]
         return buckets
 
-def print_text(iterator, max_examples_per_bucket=1):
+def print_text(iterator, max_examples_per_bucket=100):
 
     inv_src_vocab = iterator.inv_src_vocab
     inv_targ_vocab = iterator.inv_targ_vocab
@@ -241,8 +241,8 @@ if __name__ == '__main__':
     warnings.filterwarnings("ignore", category=DeprecationWarning)   
 
     dataset = get_s2s_data(
-        src_path='./data/europarl-v7.es-en.en_train_small',
-        targ_path='./data/europarl-v7.es-en.es_train_small',
+        src_path='./data/europarl-v7.es-en.en_valid_small',
+        targ_path='./data/europarl-v7.es-en.es_valid_small',
         start_label=1,
         invalid_label=0
     )
@@ -265,6 +265,6 @@ if __name__ == '__main__':
             min_len,max_len+increment,increment
         )]
 
-    i1 = Seq2SeqIter(dataset, buckets=all_pairs)
+    i1 = Seq2SeqIter(dataset, buckets=all_pairs, layout='NT')
 
     print_text(i1) 
