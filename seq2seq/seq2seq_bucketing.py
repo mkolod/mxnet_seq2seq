@@ -101,6 +101,9 @@ def get_data2(layout):
     valid_iter = Seq2SeqIter(valid_dataset, layout=layout, batch_size=args.batch_size, buckets=all_pairs)
     train_iter.reset()
     valid_iter.reset()
+    
+    print("\nSize of src vocab: %d" % len(train_iter.src_vocab))
+    print("Size of targ vocab: %d\n" % len(train_iter.targ_vocab))
 
     return train_iter, valid_iter, train_iter.src_vocab, train_iter.targ_vocab
 
@@ -154,15 +157,17 @@ def train(args):
         layout = 'TNC'
         _, states = encoder.unroll(enc_seq_len, inputs=src_embed, layout=layout)
 
-        print("\n\nstates: %s\n\n" % dir(states))
-
-        outputs, _ = decoder.unroll(dec_seq_len, inputs=targ_embed, begin_state=None, merge_outputs=True, layout=layout) # begin_state=states
+        outputs, _ = decoder.unroll(dec_seq_len, inputs=targ_embed, begin_state=states, layout=layout, merge_outputs=True)
 
         pred = mx.sym.Reshape(outputs,
-                shape=(-1, args.num_hidden))
+                shape=(-1, args.num_hidden)) # -1
         pred = mx.sym.FullyConnected(data=pred, num_hidden=len(targ_vocab), name='pred')
+#        print(pred)
+#        print(dir(pred))
+#        print(pred.infer_shape_partial())
 
-        label = mx.sym.Reshape(label, shape=(-1,))
+        pred = mx.sym.Reshape(pred, shape=(enc_seq_len, 32, args.num_hidden))
+ #       label = mx.sym.Reshape(label, shape=(enc_seq_len, 32))
 
         pred = mx.sym.SoftmaxOutput(data=pred, label=label, name='softmax')
 
@@ -173,8 +178,6 @@ def train(args):
         contexts = [mx.gpu(int(i)) for i in args.gpus.split(',')]
     else:
         contexts = mx.cpu(0)
-
-    print("default bucket key: %s" % str(data_train.default_bucket_key))
 
     model = mx.mod.BucketingModule(
         sym_gen             = sym_gen,
@@ -214,7 +217,7 @@ def train(args):
 
 def test(args):
     assert args.model_prefix, "Must specifiy path to load from"
-    _, data_val, vocab = get_data('NT')
+    _, data_val, vocab = get_data('TN') # NT
 
     encoder = mx.rnn.SequentialRNNCell()
     encoder.add(mx.rnn.LSTMCell(args.num_hidden, prefix='rnn_encoder0_'))
