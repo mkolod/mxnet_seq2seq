@@ -16,7 +16,6 @@ RUN apt-get update && apt-get -y upgrade && \
 
 # Build MxNet for Python
 RUN cd /root && git clone --recursive https://github.com/dmlc/mxnet.git && cd mxnet && git checkout 6e81d76e6830b70a4a2278ebc08e9d3e3af1c937 && \
-# https://github.com/dmlc/mxnet && cd mxnet && \
   cp make/config.mk . && \
     echo "USE_CUDA=1" >> config.mk && \
     echo "USE_CUDNN=1" >> config.mk && \
@@ -26,7 +25,9 @@ RUN cd /root && git clone --recursive https://github.com/dmlc/mxnet.git && cd mx
          "-gencode arch=compute_60,code=sm_60" \
          "-gencode arch=compute_61,code=sm_61" \
          "-gencode arch=compute_61,code=compute_61" >> config.mk && \
-    echo "USE_CUDA_PATH=/usr/local/cuda" >> config.mk && \
+    echo "USE_CUDA_PATH=/usr/local/cuda" >> config.mk 
+
+WORKDIR /root/mxnet
 
 ENV LD_LIBRARY_PATH $LD_LIBRARY_PATH:/usr/local/lib
 RUN make -j$(nproc) && \
@@ -53,5 +54,3 @@ ENV PYTHONPATH /root/mxnet/python
 
 # Build MxNet for R - WIP !!!
 #RUN apt-get -y install r-base r-base-dev
-
-WORKDIR /root/mxnet
