@@ -151,7 +151,7 @@ def get_data(layout):
 
 
 # WORK IN PROGRESS !!!
-def decoder_unroll(decoder, target_embed, unroll_length, go_symbol, begin_state=None, layout='TNC', merge_outputs=None):
+def decoder_unroll(decoder, target_embed, targ_vocab, unroll_length, go_symbol, begin_state=None, layout='TNC', merge_outputs=None):
 
         decoder.reset()
 
@@ -167,15 +167,29 @@ def decoder_unroll(decoder, target_embed, unroll_length, go_symbol, begin_state=
         # Replace this with a <GO> symbol
         feed = target_embed[0]
         output, states = decoder(feed, states)
+        pred = mx.sym.Reshape(output, shape=(-1, args.num_hidden)) 
+        pred = mx.sym.FullyConnected(data=pred, num_hidden=len(targ_vocab), name='pred')
+        outputs.append(pred)
+        output = pred.argmax(axis = 0)
+
+        outputs, _ = _normalize_sequence(unroll_length, outputs, layout, merge_outputs)
+
+        pred_word_idx = mx.sym.Variable('pred_word_idx')
+
+        embed = mx.sym.Embedding(data=pred_word_idx, input_dim=len(targ_vocab),
+            output_dim=args.num_embed, name='src_embed') 
+
 
         for i in range(unroll_length):
             output, states = decoder(output, states)
 
-`           pred = mx.sym.Reshape(output,
-                shape=(-1, args.num_hidden)) 
+            pred = mx.sym.Reshape(output, shape=(-1, args.num_hidden)) 
             pred = mx.sym.FullyConnected(data=pred, num_hidden=len(targ_vocab), name='pred')
+            # record actual probs for softmax, then get new token for embedding
             outputs.append(pred)
-            output = pred.argmax(axis = 0)
+            output = pred.argmax()
+            pred_word_idx.bind(contexts, {'pred_word_idx': output}) 
+            output = embed 
 
         outputs, _ = _normalize_sequence(unroll_length, outputs, layout, merge_outputs)
 
@@ -228,7 +242,7 @@ def train(args):
         # This should be based on EOS or max seq len for inference, but here we unroll to the target length
         # TODO: fix <GO> symbol
         print("dec_seq_len: %d" % dec_seq_len)
-        outputs, _ = decoder_unroll(decoder, targ_embed, dec_seq_len, 0, begin_state=states, layout='TNC', merge_outputs=True)
+        outputs, _ = decoder_unroll(decoder, targ_embed, targ_vocab, dec_seq_len, 0, begin_state=states, layout='TNC', merge_outputs=True)
 
         pred = mx.sym.Reshape(outputs,
                 shape=(-1, args.num_hidden)) # -1
