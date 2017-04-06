@@ -65,10 +65,12 @@ invalid_label = 0
 
 def _normalize_sequence(length, inputs, layout, merge, in_layout=None):
     from mxnet import symbol, init, ndarray, _symbol_internal
-    
+
     assert inputs is not None, \
         "unroll(inputs=None) has been deprecated. " \
         "Please create input variables outside unroll."
+
+    print("normalize_sequence: type(inputs) = %s" % str(type(inputs)))
 
     axis = layout.find('T')
     in_axis = in_layout.find('T') if in_layout is not None else axis
@@ -159,6 +161,7 @@ def decoder_unroll(decoder, target_embed, targ_vocab, unroll_length, go_symbol, 
             begin_state = decoder.begin_state()
 
         print("first normalize sequence")
+        print("decoder_unroll: type(target_embed) = %s" % str(type(target_embed)))
         inputs, _ = _normalize_sequence(unroll_length, target_embed, layout, False)
 
         # Need to use hidden state from attention model, but <GO> as input
@@ -166,11 +169,11 @@ def decoder_unroll(decoder, target_embed, targ_vocab, unroll_length, go_symbol, 
         outputs = []
 
         # Replace this with a <GO> symbol
-        feed = target_embed[0]
+        feed = inputs[0]
         output, states = decoder(feed, states)
         pred = mx.sym.Reshape(output, shape=(-1, args.num_hidden)) 
         pred = mx.sym.FullyConnected(data=pred, num_hidden=len(targ_vocab), name='pred')
-        outputs.append(pred)
+#        outputs.append(pred)
         output = mx.sym.argmax(pred) # .argmax(axis = 0)
 
 #        outputs, _ = _normalize_sequence(1, outputs, layout, merge_outputs)
@@ -189,13 +192,16 @@ def decoder_unroll(decoder, target_embed, targ_vocab, unroll_length, go_symbol, 
             # record actual probs for softmax, then get new token for embedding
             outputs.append(pred)
             output = mx.sym.argmax(pred)
+#            result = output.eval().asnumpy()
 #            new_word_idx = output.forward()
-            output = output.eval(contexts, data={'pred_word_idx': output})
+#            output = output.eval(contexts, data={'pred_word_idx': result})
 #            pred_word_idx.bind(contexts, {'pred_word_idx': output})
             #print("\ntype(new_word): %s" % type(new_word_idx)) 
-            output = embed 
+#            output = embed 
 
         print("second normalize sequence")
+        print("len(outputs): %d" % len(outputs))
+        print("unroll_length: %d" % unroll_length)
         outputs, _ = _normalize_sequence(unroll_length, outputs, layout, merge_outputs)
 
         return outputs, states
