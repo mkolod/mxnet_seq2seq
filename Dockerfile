@@ -18,11 +18,23 @@ RUN apt-get update && apt-get -y upgrade && \
 RUN cd /root && git clone --recursive https://github.com/dmlc/mxnet.git && cd mxnet && git checkout 6e81d76e6830b70a4a2278ebc08e9d3e3af1c937 && \
 # https://github.com/dmlc/mxnet && cd mxnet && \
   cp make/config.mk . && \
-  sed -i 's/USE_BLAS = atlas/USE_BLAS = openblas/g' config.mk && \
-  sed -i 's/USE_CUDA = 0/USE_CUDA = 1/g' config.mk && \
-  sed -i 's/USE_CUDA_PATH = NONE/USE_CUDA_PATH = \/usr\/local\/cuda/g' config.mk && \
-  sed -i 's/USE_CUDNN = 0/USE_CUDNN = 1/g' config.mk && \
-  make -j"$(nproc)"
+    echo "USE_CUDA=1" >> config.mk && \
+    echo "USE_CUDNN=1" >> config.mk && \
+    echo "CUDA_ARCH :=" \
+         "-gencode arch=compute_35,code=sm_35" \
+         "-gencode arch=compute_52,code=sm_52" \
+         "-gencode arch=compute_60,code=sm_60" \
+         "-gencode arch=compute_61,code=sm_61" \
+         "-gencode arch=compute_61,code=compute_61" >> config.mk && \
+    echo "USE_CUDA_PATH=/usr/local/cuda" >> config.mk && \
+
+ENV LD_LIBRARY_PATH $LD_LIBRARY_PATH:/usr/local/lib
+RUN make -j$(nproc) && \
+    mv lib/libmxnet.so /usr/local/lib && \
+    ldconfig && \
+    make clean && \
+    cd python && \
+    pip install -e .
 
 # Python3 support
 RUN apt-get -y install python3-pip
