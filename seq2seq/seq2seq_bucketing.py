@@ -123,21 +123,27 @@ def get_data(layout):
 
 
 # WORK IN PROGRESS !!!
-def decoder_unroll(decoder_sym, targ_dict, inputs, begin_state=None, layout='NTC', merge_outputs=None):
+def decoder_unroll(decoder, contexts, target_embed, unroll_length, go_symbol, begin_state=None, layout='NTC', merge_outputs=None):
 
-        go_symbol = targ_dict['<GO>']
+        decoder.reset()
 
-        # What does this do?
-        inputs, _ = _normalize_sequence(length, inputs, layout, False)
-       
-        # Fix this since it's not a class method anymore
+        feed = mx.sym.Variable('feed')
+
         if begin_state is None:
-            begin_state = self.begin_state()
+            begin_state = decoder.begin_state()
 
+        # Need to use hidden state from attention model, but <GO> as input
         states = begin_state
         outputs = []
-        for i in range(length):
+
+#>>> e = c.bind(mx.cpu(), {'a': mx.nd.array([1,2]), 'b':mx.nd.array([2,3])})
+#>>> y = e.forward()
+        input = target_embed.bind(contexts, 
+
+        for i in range(unroll_length):
+            
             output, states = self(inputs[i], states)
+            # choose argmax over output, pick next embedding
             outputs.append(output)
 
         # What does this do?
