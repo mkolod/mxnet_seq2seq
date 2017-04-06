@@ -164,14 +164,18 @@ def decoder_unroll(decoder, target_embed, unroll_length, go_symbol, begin_state=
         states = begin_state
         outputs = []
 
-#        feed = target_embed[0]
+        # Replace this with a <GO> symbol
+        feed = target_embed[0]
+        output, states = decoder(feed, states)
 
         for i in range(unroll_length):
-           # note this can't be hard-coded, choose type at runtime (could be bidirectional cell, FusedRNNCell, etc.)
-            output, states = decoder(inputs[i], states) # feed
-#            feed = output
-            # choose argmax over output, pick next embedding
-            outputs.append(output)
+            output, states = decoder(output, states)
+
+`           pred = mx.sym.Reshape(output,
+                shape=(-1, args.num_hidden)) 
+            pred = mx.sym.FullyConnected(data=pred, num_hidden=len(targ_vocab), name='pred')
+            outputs.append(pred)
+            output = pred.argmax(axis = 0)
 
         outputs, _ = _normalize_sequence(unroll_length, outputs, layout, merge_outputs)
 
@@ -218,10 +222,8 @@ def train(args):
         layout = 'TNC'
         _, states = encoder.unroll(enc_seq_len, inputs=src_embed, layout=layout)
 
-        print(states)
 
 #        outputs, _ = decoder.unroll(dec_seq_len, inputs=targ_embed, begin_state=states, layout=layout, merge_outputs=True)
-#def decoder_unroll(decoder, target_embed, unroll_length, go_symbol, begin_state=None, layout='NTC', merge_outputs=None):
 
         # This should be based on EOS or max seq len for inference, but here we unroll to the target length
         # TODO: fix <GO> symbol
