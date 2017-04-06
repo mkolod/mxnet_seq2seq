@@ -70,8 +70,6 @@ def _normalize_sequence(length, inputs, layout, merge, in_layout=None):
         "unroll(inputs=None) has been deprecated. " \
         "Please create input variables outside unroll."
 
-    print("normalize_sequence: type(inputs) = %s" % str(type(inputs)))
-
     axis = layout.find('T')
     in_axis = in_layout.find('T') if in_layout is not None else axis
     if isinstance(inputs, symbol.Symbol):
@@ -173,7 +171,6 @@ def decoder_unroll(decoder, target_embed, targ_vocab, unroll_length, go_symbol, 
         output, states = decoder(feed, states)
         pred = mx.sym.Reshape(output, shape=(-1, args.num_hidden)) 
         pred = mx.sym.FullyConnected(data=pred, num_hidden=len(targ_vocab), name='pred')
-#        outputs.append(pred)
         output = mx.sym.argmax(pred) # .argmax(axis = 0)
 
 #        outputs, _ = _normalize_sequence(1, outputs, layout, merge_outputs)
