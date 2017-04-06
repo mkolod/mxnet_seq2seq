@@ -158,6 +158,7 @@ def decoder_unroll(decoder, target_embed, targ_vocab, unroll_length, go_symbol, 
         if begin_state is None:
             begin_state = decoder.begin_state()
 
+        print("first normalize sequence")
         inputs, _ = _normalize_sequence(unroll_length, target_embed, layout, False)
 
         # Need to use hidden state from attention model, but <GO> as input
@@ -170,7 +171,7 @@ def decoder_unroll(decoder, target_embed, targ_vocab, unroll_length, go_symbol, 
         pred = mx.sym.Reshape(output, shape=(-1, args.num_hidden)) 
         pred = mx.sym.FullyConnected(data=pred, num_hidden=len(targ_vocab), name='pred')
         outputs.append(pred)
-        output = pred.argmax(axis = 0)
+        output = mx.sym.argmax(pred) # .argmax(axis = 0)
 
         outputs, _ = _normalize_sequence(unroll_length, outputs, layout, merge_outputs)
 
@@ -191,6 +192,7 @@ def decoder_unroll(decoder, target_embed, targ_vocab, unroll_length, go_symbol, 
             pred_word_idx.bind(contexts, {'pred_word_idx': output}) 
             output = embed 
 
+        print("second normalize sequence")
         outputs, _ = _normalize_sequence(unroll_length, outputs, layout, merge_outputs)
 
         return outputs, states
