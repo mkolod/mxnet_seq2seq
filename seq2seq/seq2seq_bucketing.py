@@ -173,7 +173,7 @@ def decoder_unroll(decoder, target_embed, targ_vocab, unroll_length, go_symbol, 
         outputs.append(pred)
         output = mx.sym.argmax(pred) # .argmax(axis = 0)
 
-        outputs, _ = _normalize_sequence(unroll_length, outputs, layout, merge_outputs)
+#        outputs, _ = _normalize_sequence(1, outputs, layout, merge_outputs)
 
         pred_word_idx = mx.sym.Variable('pred_word_idx')
 
@@ -188,8 +188,11 @@ def decoder_unroll(decoder, target_embed, targ_vocab, unroll_length, go_symbol, 
             pred = mx.sym.FullyConnected(data=pred, num_hidden=len(targ_vocab), name='pred')
             # record actual probs for softmax, then get new token for embedding
             outputs.append(pred)
-            output = pred.argmax()
-            pred_word_idx.bind(contexts, {'pred_word_idx': output}) 
+            output = mx.sym.argmax(pred)
+#            new_word_idx = output.forward()
+            output = output.eval(contexts, data={'pred_word_idx': output})
+#            pred_word_idx.bind(contexts, {'pred_word_idx': output})
+            #print("\ntype(new_word): %s" % type(new_word_idx)) 
             output = embed 
 
         print("second normalize sequence")
@@ -375,6 +378,11 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG, format=head)
 
     args = parser.parse_args()
+    if args.gpus:
+        contexts = [mx.gpu(int(i)) for i in args.gpus.split(',')]
+    else:
+        contexts = mx.cpu(0)
+    
 
     if args.num_layers >= 4 and len(args.gpus.split(',')) >= 4 and not args.stack_rnn:
         print('WARNING: stack-rnn is recommended to train complex model on multiple GPUs')
