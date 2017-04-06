@@ -63,6 +63,34 @@ buckets = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
 start_label = 1
 invalid_label = 0
 
+def _normalize_sequence(length, inputs, layout, merge, in_layout=None):
+    from mxnet import symbol, init, ndarray, _symbol_internal
+    
+    assert inputs is not None, \
+        "unroll(inputs=None) has been deprecated. " \
+        "Please create input variables outside unroll."
+
+    axis = layout.find('T')
+    in_axis = in_layout.find('T') if in_layout is not None else axis
+    if isinstance(inputs, symbol.Symbol):
+        if merge is False:
+            assert len(inputs.list_outputs()) == 1, \
+                "unroll doesn't allow grouped symbol as input. Please convert " \
+                "to list with list(inputs) first or let unroll handle splitting."
+            inputs = list(symbol.split(inputs, axis=in_axis, num_outputs=length,
+                                       squeeze_axis=1))
+    else: 
+        assert length is None or len(inputs) == length
+        if merge is True:
+            inputs = [symbol.expand_dims(i, axis=axis) for i in inputs]
+            inputs = symbol.Concat(*inputs, dim=axis)
+            in_axis = axis
+
+    if isinstance(inputs, symbol.Symbol) and axis != in_axis:
+        inputs = symbol.swapaxes(inputs, dim0=axis, dim1=in_axis)
+
+    return inputs, axis
+
 def get_data2(layout):
 
     train_dataset = get_s2s_data(
@@ -86,7 +114,7 @@ def get_data2(layout):
     max_len = lambda x: max(sent_len(x))
     min_len = lambda x: min(sent_len(x))
 
-    min_len = min(min(sent_len(train_src_sent)), min(sent_len(train_targ_sent)))
+    min_len = 5 #min(min(sent_len(train_src_sent)), min(sent_len(train_targ_sent)))
 
     max_len = 65
     increment = 5
@@ -123,39 +151,39 @@ def get_data(layout):
 
 
 # WORK IN PROGRESS !!!
-def decoder_unroll(decoder, contexts, target_embed, unroll_length, go_symbol, begin_state=None, layout='NTC', merge_outputs=None):
+def decoder_unroll(decoder, target_embed, unroll_length, go_symbol, begin_state=None, layout='TNC', merge_outputs=None):
 
         decoder.reset()
 
-        feed = mx.sym.Variable('feed')
-
         if begin_state is None:
             begin_state = decoder.begin_state()
+
+        inputs, _ = _normalize_sequence(unroll_length, target_embed, layout, False)
 
         # Need to use hidden state from attention model, but <GO> as input
         states = begin_state
         outputs = []
 
-#>>> e = c.bind(mx.cpu(), {'a': mx.nd.array([1,2]), 'b':mx.nd.array([2,3])})
-#>>> y = e.forward()
-        input = target_embed.bind(contexts, 
+#        feed = target_embed[0]
 
         for i in range(unroll_length):
-            
-            output, states = self(inputs[i], states)
+           # note this can't be hard-coded, choose type at runtime (could be bidirectional cell, FusedRNNCell, etc.)
+            output, states = decoder(inputs[i], states) # feed
+#            feed = output
             # choose argmax over output, pick next embedding
             outputs.append(output)
 
-        # What does this do?
-        outputs, _ = _normalize_sequence(length, outputs, layout, merge_outputs)
+        outputs, _ = _normalize_sequence(unroll_length, outputs, layout, merge_outputs)
 
         return outputs, states
 
 def train(args):
 
     # data_train, data_val, src_vocab, targ_vocab = get_data2('TN')
-    data_train, data_val, src_vocab = get_data('TN')
-    targ_vocab = src_vocab
+    data_train, data_val, src_vocab = get_data('TNC') #TN')
+    targ_vocab = src_vocab 
+
+    print("Dict size: %d" % len(src_vocab))
 
     encoder = mx.rnn.SequentialRNNCell()
 
@@ -190,7 +218,15 @@ def train(args):
         layout = 'TNC'
         _, states = encoder.unroll(enc_seq_len, inputs=src_embed, layout=layout)
 
-        outputs, _ = decoder.unroll(dec_seq_len, inputs=targ_embed, begin_state=states, layout=layout, merge_outputs=True)
+        print(states)
+
+#        outputs, _ = decoder.unroll(dec_seq_len, inputs=targ_embed, begin_state=states, layout=layout, merge_outputs=True)
+#def decoder_unroll(decoder, target_embed, unroll_length, go_symbol, begin_state=None, layout='NTC', merge_outputs=None):
+
+        # This should be based on EOS or max seq len for inference, but here we unroll to the target length
+        # TODO: fix <GO> symbol
+        print("dec_seq_len: %d" % dec_seq_len)
+        outputs, _ = decoder_unroll(decoder, targ_embed, dec_seq_len, 0, begin_state=states, layout='TNC', merge_outputs=True)
 
         pred = mx.sym.Reshape(outputs,
                 shape=(-1, args.num_hidden)) # -1
