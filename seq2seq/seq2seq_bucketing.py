@@ -211,6 +211,38 @@ def decoder_unroll(decoder, target_embed, targ_vocab, unroll_length, go_symbol, 
 
         return outputs, states
 
+def print_inferred_shapes(node, arg_shapes, aux_shapes, out_shapes):
+    args = node.list_arguments()
+    aux_states = node.list_auxiliary_states()
+    outputs = node.list_outputs()
+    print("\n================================================")
+    print("\nNODE: %s" % node.name)
+    print("\n============")
+    print("args:")
+    print("============")
+    if len(arg_shapes) == 0:
+        print("N/A")
+    for i in range(len(arg_shapes)):
+        print("%s: %s" % (args[i], arg_shapes[i]))
+    print("\n=============")
+    print("aux_states:")
+    print("=============")
+    if len(aux_shapes) == 0:
+        print("N/A")
+    for i in range(len(aux_states)):
+        print("%s: %s" % (aux_states[i], aux_shapes[i]))
+    print("\n=============")
+    print("outputs:")
+    print("==============")
+    if len(out_shapes) == 0:
+        print("N/A")
+    for i in range(len(outputs)):
+        print("%s: %s" % (outputs[i], out_shapes[i]))
+    print("\n================================================")
+    print("\n")
+
+
+
 def train(args):
 
     # data_train, data_val, src_vocab, targ_vocab = get_data2('TN')
@@ -267,6 +299,7 @@ def train(args):
 #	rnn_decoder0_i2h_weight: ()
 #	rnn_decoder0_i2h_bias: ()
 
+    src_vocab_size = len(src_vocab)
     targ_vocab_size = len(targ_vocab)
     batch_size = 32
     buck1_size = 100 #100
@@ -275,9 +308,23 @@ def train(args):
 
     print("len(states): %d" % len(states))
 
-    arg_shapes1, out_shapes1, aux_shapes1 = states[0].infer_shape(
-        data=(buck1_size, buck2_size, batch_size)
+    node = states[0]
+
+#def print_inferred_shapes(node, arg_shapes, aux_shapes, out_shapes):
+
+    print(dir(node))
+
+    arg_shapes1, out_shapes1, aux_shapes1 = node.infer_shape(
+        data=(buck1_size, buck2_size, batch_size) 
     )
+   
+    print_inferred_shapes(node, arg_shapes1, aux_shapes1, out_shapes1)
+
+#    arg_shapes1, out_shapes1, aux_shapes1 = outputs_good.infer_shape(
+#        data=(buck1_size, buck2_size, batch_size),
+#        softmax_labels=(targ_vocab_size, batch_size)
+#    )
+
 
 #    arg_shapes1, out_shapes1, aux_shapes1 = outputs_good.infer_shape(
 #        data=(buck1_size, buck2_size, batch_size), 
