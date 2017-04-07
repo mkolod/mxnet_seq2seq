@@ -169,9 +169,10 @@ def decoder_unroll(decoder, target_embed, targ_vocab, unroll_length, go_symbol, 
         # Replace this with a <GO> symbol
         feed = inputs[0]
         output, states = decoder(feed, states)
+
         pred = mx.sym.Reshape(output, shape=(-1, args.num_hidden), name='output_reshape') 
         pred = mx.sym.FullyConnected(data=pred, num_hidden=len(targ_vocab), name='pred')
-        output = mx.sym.argmax(pred, name='argmax') # .argmax(axis = 0)
+        output = mx.sym.argmax(pred, name='argmax') 
 
 #        outputs, _ = _normalize_sequence(1, outputs, layout, merge_outputs)
 
@@ -181,15 +182,21 @@ def decoder_unroll(decoder, target_embed, targ_vocab, unroll_length, go_symbol, 
             output_dim=args.num_embed, name='src_embed') 
 
 
-        for i in range(unroll_length):
-            output, states = decoder(output, states)
+        for i in range(0, unroll_length):
+            # this works            
+            output, states = decoder(inputs[i], states)
+            outputs.append(output)
 
-            pred = mx.sym.Reshape(output, shape=(-1, args.num_hidden), name='pred_reshape') 
-            pred = mx.sym.FullyConnected(data=pred, num_hidden=len(targ_vocab), name='loop_pred')
+
+#            output, states = decoder(output, states)
+#            outputs.append(output)
+
+#            pred = mx.sym.Reshape(output, shape=(-1, args.num_hidden), name='pred_reshape') 
+#            pred = mx.sym.FullyConnected(data=pred, num_hidden=len(targ_vocab), name='loop_pred')
 #            pred = mx.sym.Reshape(pred, shape=(-1,))
             # record actual probs for softmax, then get new token for embedding
-            outputs.append(pred)
-            output = mx.sym.argmax(pred)
+#            outputs.append(pred)
+#            output = mx.sym.argmax(pred)
 #            result = output.eval().asnumpy()
 #            new_word_idx = output.forward()
 #            output = output.eval(contexts, data={'pred_word_idx': result})
@@ -226,6 +233,54 @@ def train(args):
         if i < args.num_layers - 1 and args.dropout > 0.0:
             decoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_decoder%d_' % i))
     decoder.add(DotAttentionCell())
+
+    ##############################
+    # Remove this after debugging
+    data = mx.sym.Variable('data')
+    label = mx.sym.Variable('softmax_label')
+    src_embed = mx.sym.Embedding(data=data, input_dim=len(src_vocab),
+				 output_dim=args.num_embed, name='src_embed') 
+    targ_embed = mx.sym.Embedding(data=label, input_dim=len(targ_vocab),
+				 output_dim=args.num_embed, name='targ_embed')
+
+    encoder.reset()
+    decoder.reset()
+
+    enc_seq_len = 100 #seq_len
+    dec_seq_len = 100 # seq_len
+	#        enc_seq_len, dec_seq_len = seq_len
+
+    layout = 'TNC'
+    _, states = encoder.unroll(enc_seq_len, inputs=src_embed, layout=layout)
+
+    outputs_good, _ = decoder.unroll(dec_seq_len, inputs=targ_embed, begin_state=states, layout=layout, merge_outputs=True)
+    outputs_bad, _ = decoder_unroll(decoder, targ_embed, targ_vocab, dec_seq_len, 0, begin_state=states, layout='TNC', merge_outputs=True)
+    
+ 
+#    data.bind(mx.cpu(), {'data': 1})
+
+#    label.bind(mx.cpu(), ) 
+
+
+#	softmax_label: ()
+#	targ_embed_weight: ()
+#	rnn_decoder0_i2h_weight: ()
+#	rnn_decoder0_i2h_bias: ()
+
+    targ_vocab_size = len(targ_vocab)
+    batch_size = 32
+    buck1_size = 100
+    buck2_size = 100
+    embed_size = 200
+    arg_shapes1, out_shapes1, aux_shapes1 = outputs_good.infer_shape(
+        data=(buck1_size, buck2_size, batch_size), 
+        softmax_label=(embed_size, targ_vocab_size, batch_size),
+        targ_embed_weight=(embed_size, targ_vocab_size))
+#    arg_shapes2, out_shapes2, aux_shapes2 = outputs_bad.infer_shape(data=(100, 100, 32))
+
+    import sys
+    sys.exit(1)    
+    ##############################
 
     def sym_gen(seq_len):
         data = mx.sym.Variable('data')
