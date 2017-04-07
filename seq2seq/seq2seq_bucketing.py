@@ -254,7 +254,7 @@ def train(args):
     _, states = encoder.unroll(enc_seq_len, inputs=src_embed, layout=layout)
 
     outputs_good, _ = decoder.unroll(dec_seq_len, inputs=targ_embed, begin_state=states, layout=layout, merge_outputs=True)
-    outputs_bad, _ = decoder_unroll(decoder, targ_embed, targ_vocab, dec_seq_len, 0, begin_state=states, layout='TNC', merge_outputs=True)
+#    outputs_bad, _ = decoder_unroll(decoder, targ_embed, targ_vocab, dec_seq_len, 0, begin_state=states, layout='TNC', merge_outputs=True)
     
  
 #    data.bind(mx.cpu(), {'data': 1})
@@ -269,14 +269,23 @@ def train(args):
 
     targ_vocab_size = len(targ_vocab)
     batch_size = 32
-    buck1_size = 100
-    buck2_size = 100
+    buck1_size = 100 #100
+    buck2_size = 100 #100
     embed_size = 200
-    arg_shapes1, out_shapes1, aux_shapes1 = outputs_good.infer_shape(
-        data=(buck1_size, buck2_size, batch_size), 
-        softmax_label=(embed_size, targ_vocab_size, batch_size),
-        targ_embed_weight=(embed_size, targ_vocab_size))
+
+    arg_shapes1, out_shapes1, aux_shapes1 = states[0].infer_shape(
+        data=(buck1_size, buck2_size, batch_size)
+    )
+
+#    arg_shapes1, out_shapes1, aux_shapes1 = outputs_good.infer_shape(
+#        data=(buck1_size, buck2_size, batch_size), 
+#        softmax_label=(embed_size, targ_vocab_size, batch_size),
+#        targ_embed_weight=(embed_size, targ_vocab_size))
 #    arg_shapes2, out_shapes2, aux_shapes2 = outputs_bad.infer_shape(data=(100, 100, 32))
+
+    print("arg_shapes: %s" % str(arg_shapes1))
+    print("out_shapes: %s" % str(out_shapes1))
+    print("aux_shapes: %s" % str(aux_shapes1))
 
     import sys
     sys.exit(1)    
