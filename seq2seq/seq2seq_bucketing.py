@@ -63,6 +63,36 @@ buckets = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
 start_label = 1
 invalid_label = 0
 
+def print_inferred_shapes(node, arg_shapes, aux_shapes, out_shapes):
+    args = node.list_arguments()
+    aux_states = node.list_auxiliary_states()
+    outputs = node.list_outputs()
+    print("\n================================================")
+    print("\nNODE: %s" % node.name)
+    print("\n============")
+    print("args:")
+    print("============")
+    if len(arg_shapes) == 0:
+        print("N/A")
+    for i in range(len(arg_shapes)):
+        print("%s: %s" % (args[i], arg_shapes[i]))
+    print("\n=============")
+    print("aux_states:")
+    print("=============")
+    if len(aux_shapes) == 0:
+        print("N/A")
+    for i in range(len(aux_states)):
+        print("%s: %s" % (aux_states[i], aux_shapes[i]))
+    print("\n=============")
+    print("outputs:")
+    print("==============")
+    if len(out_shapes) == 0:
+        print("N/A")
+    for i in range(len(outputs)):
+        print("%s: %s" % (outputs[i], out_shapes[i]))
+    print("\n================================================")
+    print("\n")
+
 def _normalize_sequence(length, inputs, layout, merge, in_layout=None):
     from mxnet import symbol, init, ndarray, _symbol_internal
 
@@ -181,7 +211,6 @@ def decoder_unroll(decoder, target_embed, targ_vocab, unroll_length, go_symbol, 
         embed = mx.sym.Embedding(data=pred_word_idx, input_dim=len(targ_vocab),
             output_dim=args.num_embed, name='src_embed') 
 
-
         for i in range(0, unroll_length):
             # this works            
             output, states = decoder(inputs[i], states)
@@ -210,38 +239,6 @@ def decoder_unroll(decoder, target_embed, targ_vocab, unroll_length, go_symbol, 
         outputs, _ = _normalize_sequence(unroll_length, outputs, layout, merge_outputs)
 
         return outputs, states
-
-def print_inferred_shapes(node, arg_shapes, aux_shapes, out_shapes):
-    args = node.list_arguments()
-    aux_states = node.list_auxiliary_states()
-    outputs = node.list_outputs()
-    print("\n================================================")
-    print("\nNODE: %s" % node.name)
-    print("\n============")
-    print("args:")
-    print("============")
-    if len(arg_shapes) == 0:
-        print("N/A")
-    for i in range(len(arg_shapes)):
-        print("%s: %s" % (args[i], arg_shapes[i]))
-    print("\n=============")
-    print("aux_states:")
-    print("=============")
-    if len(aux_shapes) == 0:
-        print("N/A")
-    for i in range(len(aux_states)):
-        print("%s: %s" % (aux_states[i], aux_shapes[i]))
-    print("\n=============")
-    print("outputs:")
-    print("==============")
-    if len(out_shapes) == 0:
-        print("N/A")
-    for i in range(len(outputs)):
-        print("%s: %s" % (outputs[i], out_shapes[i]))
-    print("\n================================================")
-    print("\n")
-
-
 
 def train(args):
 
@@ -286,7 +283,7 @@ def train(args):
     _, states = encoder.unroll(enc_seq_len, inputs=src_embed, layout=layout)
 
     outputs_good, _ = decoder.unroll(dec_seq_len, inputs=targ_embed, begin_state=states, layout=layout, merge_outputs=True)
-#    outputs_bad, _ = decoder_unroll(decoder, targ_embed, targ_vocab, dec_seq_len, 0, begin_state=states, layout='TNC', merge_outputs=True)
+    outputs_bad, _ = decoder_unroll(decoder, targ_embed, targ_vocab, dec_seq_len, 0, begin_state=states, layout='TNC', merge_outputs=True)
     
  
 #    data.bind(mx.cpu(), {'data': 1})
@@ -320,10 +317,10 @@ def train(args):
    
     print_inferred_shapes(node, arg_shapes1, aux_shapes1, out_shapes1)
 
-#    arg_shapes1, out_shapes1, aux_shapes1 = outputs_good.infer_shape(
+    arg_shapes1, out_shapes1, aux_shapes1 = outputs_good.infer_shape(
 #        data=(buck1_size, buck2_size, batch_size),
-#        softmax_labels=(targ_vocab_size, batch_size)
-#    )
+        softmax_label=(targ_vocab_size, batch_size)
+    )
 
 
 #    arg_shapes1, out_shapes1, aux_shapes1 = outputs_good.infer_shape(
