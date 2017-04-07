@@ -317,7 +317,7 @@ def train(args):
    
     print_inferred_shapes(node, arg_shapes1, aux_shapes1, out_shapes1)
 
-    arg_shapes1, out_shapes1, aux_shapes1 = outputs_good.infer_shape(
+    arg_shapes2, out_shapes2, aux_shapes2 = outputs_good.infer_shape(
 #        data=(buck1_size, buck2_size, batch_size),
         softmax_label=(targ_vocab_size, batch_size)
     )
