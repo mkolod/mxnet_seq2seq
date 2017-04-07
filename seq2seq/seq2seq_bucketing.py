@@ -273,6 +273,8 @@ def train(args):
     buck2_size = 100 #100
     embed_size = 200
 
+    print("len(states): %d" % len(states))
+
     arg_shapes1, out_shapes1, aux_shapes1 = states[0].infer_shape(
         data=(buck1_size, buck2_size, batch_size)
     )
