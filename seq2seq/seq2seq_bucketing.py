@@ -169,9 +169,9 @@ def decoder_unroll(decoder, target_embed, targ_vocab, unroll_length, go_symbol, 
         # Replace this with a <GO> symbol
         feed = inputs[0]
         output, states = decoder(feed, states)
-        pred = mx.sym.Reshape(output, shape=(-1, args.num_hidden)) 
+        pred = mx.sym.Reshape(output, shape=(-1, args.num_hidden), name='output_reshape') 
         pred = mx.sym.FullyConnected(data=pred, num_hidden=len(targ_vocab), name='pred')
-        output = mx.sym.argmax(pred) # .argmax(axis = 0)
+        output = mx.sym.argmax(pred, name='argmax') # .argmax(axis = 0)
 
 #        outputs, _ = _normalize_sequence(1, outputs, layout, merge_outputs)
 
@@ -184,8 +184,9 @@ def decoder_unroll(decoder, target_embed, targ_vocab, unroll_length, go_symbol, 
         for i in range(unroll_length):
             output, states = decoder(output, states)
 
-            pred = mx.sym.Reshape(output, shape=(-1, args.num_hidden)) 
-            pred = mx.sym.FullyConnected(data=pred, num_hidden=len(targ_vocab), name='pred')
+            pred = mx.sym.Reshape(output, shape=(-1, args.num_hidden), name='pred_reshape') 
+            pred = mx.sym.FullyConnected(data=pred, num_hidden=len(targ_vocab), name='loop_pred')
+#            pred = mx.sym.Reshape(pred, shape=(-1,))
             # record actual probs for softmax, then get new token for embedding
             outputs.append(pred)
             output = mx.sym.argmax(pred)
