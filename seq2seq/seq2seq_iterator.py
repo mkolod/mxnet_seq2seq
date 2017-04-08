@@ -68,6 +68,7 @@ class Seq2SeqIter(DataIter):
         self.num_buckets = len(self.bucket_idx_to_key)
         self.bucket_iterator_indices = list(range(self.num_buckets))
         self.default_bucket_key = self.sorted_keys[-1]
+        self.counter = 0
 
         if self.layout == 'TN':
             self.provide_data = [mx.io.DataDesc(self.data_name, (self.default_bucket_key[0], self.batch_size), layout='TN')]
@@ -136,6 +137,8 @@ class Seq2SeqIter(DataIter):
 
     # iterate over data
     def next(self):
+        print("iterator call # %d" % self.counter)
+        self.counter += 1
         try:
             if self.switch_bucket:
                 self.interbucket_idx += 1
