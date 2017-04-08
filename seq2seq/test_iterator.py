@@ -121,7 +121,7 @@ def _normalize_sequence(length, inputs, layout, merge, in_layout=None):
 
     return inputs, axis
 
-def get_data2(layout):
+def get_data2(layout, buckets):
 
     train_dataset = get_s2s_data(
         src_path='./data/europarl-v7.es-en.en_train_small',
@@ -155,8 +155,8 @@ def get_data2(layout):
             min_len,max_len+increment,increment
         )]
 
-    train_iter = Seq2SeqIter(train_dataset, layout=layout, batch_size=args.batch_size, buckets=all_pairs)
-    valid_iter = Seq2SeqIter(valid_dataset, layout=layout, batch_size=args.batch_size, buckets=all_pairs)
+    train_iter = Seq2SeqIter(train_dataset, layout=layout, batch_size=32, buckets=buckets)
+    valid_iter = Seq2SeqIter(valid_dataset, layout=layout, batch_size=32, buckets=buckets)
     train_iter.reset()
     valid_iter.reset()
     
@@ -250,12 +250,14 @@ increment = 5
 #        min_len,max_len+increment,increment
 #    )]
 
+from time import time
+
 buckets = list(range(min_len, max_len, increment))
 
-
+start = time()
 data_train1, data_val1, src_vocab1, targ_vocab1 = get_data('TNC', buckets)
-#targ_vocab = src_vocab
-#data_train2, data_val2, src_vocab2, targ_vocab2 = get_data2('TN')
+print(time() - start)
+
 
 buckets = [(i, j) for i in xrange(
         min_len,max_len+increment,increment
@@ -263,5 +265,6 @@ buckets = [(i, j) for i in xrange(
         min_len,max_len+increment,increment
     )]
 
-
-
+start = time()
+data_train2, data_val2, src_vocab2, targ_vocab2 = get_data2('TN', buckets)
+print(time() - start)
