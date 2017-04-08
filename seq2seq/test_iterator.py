@@ -268,3 +268,9 @@ buckets = [(i, j) for i in xrange(
 start = time()
 data_train2, data_val2, src_vocab2, targ_vocab2 = get_data2('TN', buckets)
 print(time() - start)
+
+print(data_train1.next())
+
+print("\n\n\n")
+
+print(data_train2.next())
