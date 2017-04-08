@@ -1,22 +1,9 @@
 FROM nvidia/cuda:8.0-cudnn5-devel
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        build-essential \
-        ca-certificates \
-        curl \
-        wget \
-        git \
-        cmake \
-        libatlas-base-dev \
-        libglib2.0-dev \
-        libtiff5-dev \
-        libjpeg8-dev \
-        zlib1g-dev \
-        python-dev && \
-    rm -rf /var/lib/apt/lists/*
-
 RUN apt-get update && apt-get -y upgrade && \
   apt-get install -y \
+  build-essential \
+  ca-certificates \
   git \
   libopenblas-dev \
   libopencv-dev \
@@ -24,26 +11,19 @@ RUN apt-get update && apt-get -y upgrade && \
   python-numpy \
   python-setuptools \
   wget \
+  cmake \
+  curl \
   python-pip \
+  python-dev \
   unzip \ 
   sudo \
-  vim
+  vim \
+  libglib2.0-dev \
+  libtiff5-dev \
+  libjpeg8-dev \
+  zlib1g-dev 
 
-RUN curl -O https://bootstrap.pypa.io/get-pip.py && \
-    python get-pip.py && \
-    rm get-pip.py
-
-RUN pip install --upgrade --no-cache-dir numpy setuptools requests
-
-RUN OPENCV_VERSION=3.1.0 && \
-    wget -q -O - https://github.com/Itseez/opencv/archive/${OPENCV_VERSION}.tar.gz | tar -xzf - && \
-    cd /opencv-${OPENCV_VERSION} && \
-    cmake -DCMAKE_BUILD_TYPE=RELEASE -DCMAKE_INSTALL_PREFIX=/usr \
-          -DWITH_CUDA=OFF -DWITH_1394=OFF \
-          -DBUILD_opencv_cudalegacy=OFF -DBUILD_opencv_stitching=OFF -DWITH_IPP=OFF . && \
-    make -j"$(nproc)" install && \
-    cp lib/cv2.so /usr/local/lib/python2.7/site-packages/ && \
-    rm -rf /opencv-${OPENCV_VERSION}
+RUN pip install --upgrade --no-cache-dir numpy scipy matplotlib scikit-learn sympy nltk jupyter setuptools requests
 
 # Build MxNet for Python
 RUN cd /root && git clone --recursive https://github.com/dmlc/mxnet.git && cd mxnet && git checkout 6e81d76e6830b70a4a2278ebc08e9d3e3af1c937 && \
@@ -73,7 +53,6 @@ RUN apt-get -y install python3-pip
 RUN pip3 install numpy
 
 # Jupyter notebook support
-RUN pip install jupyter
 COPY jupyter_notebook_config.py /root/.jupyter/jupyter_notebook_config.py
 EXPOSE 8888
 
