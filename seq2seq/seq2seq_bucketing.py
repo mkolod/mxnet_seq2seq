@@ -133,8 +133,8 @@ def get_data2(layout):
     )
 
     valid_dataset = get_s2s_data(
-        src_path='./data/europarl-v7.es-en.en_valid_small',
-        targ_path='./data/europarl-v7.es-en.es_valid_small',
+        src_path='./data/europarl-v7.es-en.en_train_small',
+        targ_path='./data/europarl-v7.es-en.es_train_small',
         start_label=1,
         invalid_label=0
     )
