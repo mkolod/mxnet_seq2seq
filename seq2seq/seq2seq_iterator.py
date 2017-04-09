@@ -137,8 +137,8 @@ class Seq2SeqIter(DataIter):
 
     # iterate over data
     def next(self):
-        print("iterator call # %d" % self.counter)
-        self.counter += 1
+#        print("iterator call # %d" % self.counter)
+#        self.counter += 1
         try:
             if self.switch_bucket:
                 self.interbucket_idx += 1
@@ -161,20 +161,21 @@ class Seq2SeqIter(DataIter):
                 targ_ex = targ_ex.T
 
             if self.layout == 'TN':
-                provide_data = [mx.io.DataDesc(self.data_name, (src_ex.shape[0], src_ex.shape[1], self.batch_size), layout='TN')]
-                provide_label = [mx.io.DataDesc(self.label_name, (targ_ex.shape[0], targ_ex.shape[1], self.batch_size), layout='TN')] 
+                provide_data = [mx.io.DataDesc(self.data_name, (src_ex.shape[0], src_ex.shape[1]), layout='TN')] # src_ex.shape[1] # self.batch_size
+                provide_label = [mx.io.DataDesc(self.label_name, (targ_ex.shape[0], self.batch_size), layout='TN')] # targ_ex.shape[1]
 
             elif self.layout == 'NT':
-                provide_data = [(self.data_name, (self.batch_size, src_ex.shape[0], src_ex.shape[1]))]
-                provide_label = [(self.label_name, (self.batch_size, targ_ex.shape[0], targ_ex.shape[1]))]
+                provide_data = [(self.data_name, (self.batch_size, src_ex.shape[0]))]
+                provide_label = [(self.label_name, (self.batch_size, targ_ex.shape[0]))]
             else:
                 raise Exception("Layout must be 'TN' or 'NT'") 
 
 
-            return DataBatch([src_ex], [targ_ex], pad=0,
+            batch = DataBatch([src_ex], [targ_ex], pad=0,
                              bucket_key=self.bucket_idx_to_key[self.curr_bucket_id],
                              provide_data=provide_data,
                              provide_label=provide_label)
+            return batch
                 
         except StopIteration as si:
             if self.interbucket_idx == self.num_buckets - 1:

@@ -269,7 +269,20 @@ start = time()
 data_train2, data_val2, src_vocab2, targ_vocab2 = get_data2('TN', buckets)
 print(time() - start)
 
-print(data_train1.next())
+try:
+    while True:
+        print(data_train1.next())
+except StopIteration as e:
+    pass
+
+print("\n\ndata2\n\n")
+
+try:
+    while True:
+        print(data_train2.next())
+except StopIteration as e:
+    pass
+
 
 print("\n\n\n")
 
