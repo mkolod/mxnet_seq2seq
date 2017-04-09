@@ -127,16 +127,12 @@ def get_data2(layout):
 
     train_dataset = get_s2s_data(
         src_path='./data/europarl-v7.es-en.en_train_small',
-        targ_path='./data/europarl-v7.es-en.es_train_small',
-        start_label=1,
-        invalid_label=0
+        targ_path='./data/europarl-v7.es-en.es_train_small'
     )
 
     valid_dataset = get_s2s_data(
         src_path='./data/europarl-v7.es-en.en_train_small',
-        targ_path='./data/europarl-v7.es-en.es_train_small',
-        start_label=1,
-        invalid_label=0
+        targ_path='./data/europarl-v7.es-en.es_train_small'
 #        src_vocab = train_dataset.src_vocab,
 #        targ_vocab = train_dataset.targ_vocab
     )
