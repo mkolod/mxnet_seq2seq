@@ -55,6 +55,9 @@ class Seq2SeqIter(DataIter):
         self.bisect = Seq2SeqIter.TwoDBisect(self.buckets)
         self.max_sent_len = max_sent_len
         self.pad_id = self.src_vocab['<PAD>']
+        self.eos_id = self.src_vocab['<EOS>']
+        self.unk_id = self.src_vocab['<UNK>']
+        self.go_id  = self.src_vocab['<GO>']
         # After bucketization, we should probably del self.src_sent and self.targ_sent
         # to free up memory.
         self.sorted_keys = None
@@ -102,14 +105,16 @@ class Seq2SeqIter(DataIter):
                 continue
 
             # create padded representation
-            new_src = np.full((len(value), key[0]), self.pad_id, dtype=self.dtype)
-            new_targ = np.full((len(value), key[1]), self.pad_id, dtype=self.dtype)
+            new_src = np.full((len(value) + 1, key[0]), self.pad_id, dtype=self.dtype)
+            new_targ = np.full((len(value) + 2, key[1]), self.pad_id, dtype=self.dtype)
             
             for idx, example in enumerate(value):
                 curr_src, curr_targ = example
                 rev_src = curr_src[::-1]
-                new_src[idx, :-(len(rev_src)+1):-1] = curr_src
-                new_targ[idx, :len(curr_targ)] = curr_targ
+#                new_src[idx, :-(len(rev_src)+1):-1] = curr_src
+                new_targ[idx, 1:(len(curr_targ)-1)] = curr_targ
+                new_targ[idx, 0] = self.go_id
+                new_targ[idx, len(curr_targ)-1] = self.eos_id
                             
             bucketed_data.append((new_src, new_targ))
 
