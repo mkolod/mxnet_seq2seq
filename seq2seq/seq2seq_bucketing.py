@@ -137,6 +137,8 @@ def get_data2(layout):
         targ_path='./data/europarl-v7.es-en.es_train_small',
         start_label=1,
         invalid_label=0
+#        src_vocab = train_dataset.src_vocab,
+#        targ_vocab = train_dataset.targ_vocab
     )
 
     train_src_sent = train_dataset.src_sent
