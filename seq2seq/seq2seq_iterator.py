@@ -113,23 +113,21 @@ class Seq2SeqIter(DataIter):
 #                new_src[idx, :-(len(rev_src)+1):-1] = curr_src
 #                new_targ[idx, :len(curr_targ)] = curr_targ
 
-            print(value)
-            print(type(value))
             # create padded representation
-            new_src = np.full((len(value[0]) + 1, key[0]), self.pad_id, dtype=self.dtype)
-            new_targ = np.full((len(value[1]) + 2, key[1]), self.pad_id, dtype=self.dtype)
+            new_src = np.full((len(value), key[0] + 1), self.pad_id, dtype=self.dtype)
+            new_targ = np.full((len(value), key[1] + 2), self.pad_id, dtype=self.dtype)
             
             for idx, example in enumerate(value):
                 curr_src, curr_targ = example
-                rev_src = curr_src[::-1]
+#                rev_src = curr_src[::-1]
 #                new_src[idx, :-(len(rev_src)+1):-1] = curr_src 
                 # TODO: add <EOS> at the end
                 #       (at the beginning after reversing)
-                new_src[idx, -len(rev_src)-1] = self.eos_id
-                new_src[idx, -len(rev_src):] = rev_src #curr_src
+                new_src[idx, -len(curr_src)-1] = self.eos_id
+                new_src[idx, -len(curr_src):] = curr_src
                 new_targ[idx, 0] = self.go_id
-#                new_targ[idx, 1:-1] = curr_targ
-                new_targ[idx, -1] = self.eos_id
+                new_targ[idx, 1:(len(curr_targ)+1)] = curr_targ
+                new_targ[idx, len(curr_targ)+1] = self.eos_id
                             
             bucketed_data.append((new_src, new_targ))
 
@@ -137,6 +135,7 @@ class Seq2SeqIter(DataIter):
         return bucketed_data, bucket_idx_to_key
     
     def current_bucket_key(self):
+
         return self.bucket_idx_to_key[self.interbucket_idx]
     
     def current_bucket_index(self):
