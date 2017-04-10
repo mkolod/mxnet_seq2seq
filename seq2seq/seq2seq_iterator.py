@@ -29,8 +29,10 @@ class Seq2SeqIter(DataIter):
     
     def __init__(
         self, dataset, buckets=None, batch_size=32, max_sent_len=None,
-        src_data_name='src_data', label_name='softmax_label', dtype=np.int32, layout='TN'):
+        src_data_name='src_data', targ_data_name='targ_data',
+        label_name='softmax_label', dtype=np.int32, layout='TN'):
         self.src_data_name = src_data_name
+        self.targ_data_name = targ_data_name
         self.label_name = label_name
         self.dtype = dtype
         self.layout = layout
@@ -71,13 +73,17 @@ class Seq2SeqIter(DataIter):
         self.num_buckets = len(self.bucket_idx_to_key)
         self.bucket_iterator_indices = list(range(self.num_buckets))
         self.default_bucket_key = self.sorted_keys[-1]
-        self.counter = 0
 
         if self.layout == 'TN':
-            self.provide_data = [mx.io.DataDesc(self.src_data_name, (self.default_bucket_key[0], self.batch_size), layout='TN')]
+            self.provide_data = [
+                mx.io.DataDesc(self.src_data_name, (self.default_bucket_key[0], self.batch_size), layout='TN'),
+                mx.io.DataDesc(self.targ_data_name, (self.default_bucket_key[0], self.batch_size), layout='TN')
+            ]
             self.provide_label = [mx.io.DataDesc(self.label_name, (self.default_bucket_key[1], self.batch_size), layout='TN')] 
         elif self.layout == 'NT':
-            self.provide_data = [(self.src_data_name, (self.batch_size, self.default_bucket_key[0]))]
+            self.provide_data = [
+                (self.src_data_name, (self.batch_size, self.default_bucket_key[0])),
+                (self.targ_data_name, (self.batch_size, self.default_bucket_key[0]))]
             self.provide_label = [(self.label_name, (self.batch_size, self.default_bucket_key[1]))]
         else:
             raise ValueError("Invalid layout %s: Must by NT (batch major) or TN (time major)")
@@ -105,19 +111,23 @@ class Seq2SeqIter(DataIter):
 
             # create padded representation
             new_src = np.full((len(value), key[0]), self.pad_id, dtype=self.dtype)
-            new_targ = np.full((len(value), key[1] + 2), self.pad_id, dtype=self.dtype)
+            new_targ = np.full((len(value), key[1] + 1), self.pad_id, dtype=self.dtype)
+            new_label = np.full((len(value), key[1] + 1), self.pad_id, dtype=self.dtype)
             
             for idx, example in enumerate(value):
                 curr_src, curr_targ = example
                 rev_src = curr_src[::-1]
                 new_src[idx, -len(curr_src):] = rev_src
+
                 new_targ[idx, 0] = self.go_id
                 new_targ[idx, 1:(len(curr_targ)+1)] = curr_targ
-                new_targ[idx, len(curr_targ)+1] = self.eos_id
-                            
-            bucketed_data.append((new_src, new_targ))
 
-            bucket_idx_to_key.append((key[0], key[1]+2))
+                new_label[idx, 0:len(curr_targ)] = curr_targ
+                new_label[idx, len(curr_targ)] = self.eos_id
+                            
+            bucketed_data.append((new_src, new_targ, new_label))
+
+            bucket_idx_to_key.append((key[0], key[1]+1))
         return bucketed_data, bucket_idx_to_key
     
     def current_bucket_key(self):
@@ -132,18 +142,17 @@ class Seq2SeqIter(DataIter):
         self.interbucket_idx = -1
         for idx in xrange(len(self.bucketed_data)):
             current = self.bucketed_data[idx]
-            src, targ = current
+            src, targ, label = current
             indices = np.array(range(src.shape[0]))
             np.random.shuffle(indices)
             src = src[indices]
             targ = targ[indices]
-            self.bucketed_data[idx] = (src, targ)
+            label = label[indices]
+            self.bucketed_data[idx] = (src, targ, label)
         shuffle(self.bucket_iterator_indices)
 
     # iterate over data
     def next(self):
-#        print("iterator call # %d" % self.counter)
-#        self.counter += 1
         try:
             if self.switch_bucket:
                 self.interbucket_idx += 1
@@ -160,23 +169,29 @@ class Seq2SeqIter(DataIter):
             current = self.curr_chunks.next()
             src_ex = ndarray.array(self.curr_buck[0][current])
             targ_ex = ndarray.array(self.curr_buck[1][current])
+            label_ex = ndarray.array(self.curr_buck[2][current])
 
             if self.layout == 'TN':
                 src_ex = src_ex.T
                 targ_ex = targ_ex.T
+                label_ex = label_ex.T
 
             if self.layout == 'TN':
-                provide_data = [mx.io.DataDesc(self.src_data_name, (src_ex.shape[0], src_ex.shape[1]), layout='TN')] # src_ex.shape[1] # self.batch_size
+                provide_data = [
+                    mx.io.DataDesc(self.src_data_name, (src_ex.shape[0], src_ex.shape[1]), layout='TN'),
+                    mx.io.DataDesc(self.targ_data_name, (targ_ex.shape[0], targ_ex.shape[1]), layout='TN')] # src_ex.shape[1] # self.batch_size
                 provide_label = [mx.io.DataDesc(self.label_name, (targ_ex.shape[0], self.batch_size), layout='TN')] # targ_ex.shape[1]
 
             elif self.layout == 'NT':
-                provide_data = [(self.src_data_name, (self.batch_size, src_ex.shape[0]))]
+                provide_data = [
+                    (self.src_data_name, (self.batch_size, src_ex.shape[0])),
+                    (self.targ_data_name, (self.batch_size, targ_ex.shape[0]))]
                 provide_label = [(self.label_name, (self.batch_size, targ_ex.shape[0]))]
             else:
                 raise Exception("Layout must be 'TN' or 'NT'") 
 
 
-            batch = DataBatch([src_ex], [targ_ex], pad=0,
+            batch = DataBatch([src_ex, targ_ex], [label_ex], pad=0,
                              bucket_key=self.bucket_idx_to_key[self.curr_bucket_id],
                              provide_data=provide_data,
                              provide_label=provide_label)

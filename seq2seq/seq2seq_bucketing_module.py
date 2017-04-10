@@ -53,7 +53,8 @@ class Seq2SeqBucketingModule(BaseModule):
         state_names = list(state_names) if state_names is not None else []
         fixed_param_names = list(fixed_param_names) if fixed_param_names is not None else []
 
-        _check_input_names(symbol, data_names, "data", True)
+        _check_input_names(symbol, data_names, "src_data", True)
+        _check_input_names(symbol, data_names, "targ_data", True)
         _check_input_names(symbol, label_names, "label", False)
         _check_input_names(symbol, state_names, "state", True)
         _check_input_names(symbol, fixed_param_names, "fixed_param", True)

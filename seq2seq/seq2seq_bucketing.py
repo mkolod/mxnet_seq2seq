@@ -269,9 +269,10 @@ def train(args):
 
     ##############################
     # Remove this after debugging
-    data = mx.sym.Variable('data')
+    src_data = mx.sym.Variable('src_data')
+    targ_data = mx.sym.Variable('targ_data')
     label = mx.sym.Variable('softmax_label')
-    src_embed = mx.sym.Embedding(data=data, input_dim=len(src_vocab),
+    src_embed = mx.sym.Embedding(data=src_data, input_dim=len(src_vocab),
 				 output_dim=args.num_embed, name='src_embed') 
     targ_embed = mx.sym.Embedding(data=label, input_dim=len(targ_vocab),
 				 output_dim=args.num_embed, name='targ_embed')
@@ -280,12 +281,13 @@ def train(args):
     decoder.reset()
 
     def sym_gen(seq_len):
-        data = mx.sym.Variable('src_data')
+        src_data = mx.sym.Variable('src_data')
+        targ_data = mx.sym.Variable('targ_data')
         label = mx.sym.Variable('softmax_label')
  
-        src_embed = mx.sym.Embedding(data=data, input_dim=len(src_vocab), 
+        src_embed = mx.sym.Embedding(data=src_data, input_dim=len(src_vocab), 
                                  output_dim=args.num_embed, name='src_embed') 
-        targ_embed = mx.sym.Embedding(data=label, input_dim=len(targ_vocab),    # data=data
+        targ_embed = mx.sym.Embedding(data=targ_data, input_dim=len(targ_vocab),    # data=data
                                  output_dim=args.num_embed, name='targ_embed')
 
         encoder.reset()
@@ -320,7 +322,7 @@ def train(args):
 
         pred = mx.sym.SoftmaxOutput(data=pred, label=label, name='softmax')
 
-        return pred, ('src_data',), ('softmax_label',)
+        return pred, ('src_data', 'targ_data',), ('softmax_label',)
 
 
     if args.gpus:
