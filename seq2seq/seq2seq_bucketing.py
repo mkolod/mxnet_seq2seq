@@ -267,19 +267,6 @@ def train(args):
             decoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_decoder%d_' % i))
     decoder.add(DotAttentionCell())
 
-    ##############################
-    # Remove this after debugging
-    src_data = mx.sym.Variable('src_data')
-    targ_data = mx.sym.Variable('targ_data')
-    label = mx.sym.Variable('softmax_label')
-    src_embed = mx.sym.Embedding(data=src_data, input_dim=len(src_vocab),
-				 output_dim=args.num_embed, name='src_embed') 
-    targ_embed = mx.sym.Embedding(data=label, input_dim=len(targ_vocab),
-				 output_dim=args.num_embed, name='targ_embed')
-
-    encoder.reset()
-    decoder.reset()
-
     def sym_gen(seq_len):
         src_data = mx.sym.Variable('src_data')
         targ_data = mx.sym.Variable('targ_data')
