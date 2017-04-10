@@ -11,8 +11,6 @@ from seq2seq_iterator import *
 
 from attention_cell import AttentionEncoderCell, DotAttentionCell
 
-from seq2seq_bucketing_module import Seq2SeqBucketingModule
-
 parser = argparse.ArgumentParser(description="Train RNN on Penn Tree Bank",
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('--test', default=False, action='store_true',
@@ -318,7 +316,7 @@ def train(args):
         contexts = mx.cpu(0)
 
     # mx.mod.BucketingModule
-    model = Seq2SeqBucketingModule(
+    model = mx.mod.BucketingModule(  # Seq2SeqBucketingModule(
         sym_gen             = sym_gen,
         default_bucket_key  = data_train.default_bucket_key,
         context             = contexts)
