@@ -254,9 +254,9 @@ from time import time
 
 buckets = list(range(min_len, max_len, increment))
 
-start = time()
-data_train1, data_val1, src_vocab1, targ_vocab1 = get_data('TNC', buckets)
-print(time() - start)
+#start = time()
+#data_train1, data_val1, src_vocab1, targ_vocab1 = get_data('TNC', buckets)
+#print(time() - start)
 
 
 buckets = [(i, j) for i in xrange(
@@ -269,21 +269,26 @@ start = time()
 data_train2, data_val2, src_vocab2, targ_vocab2 = get_data2('TN', buckets)
 print(time() - start)
 
-try:
-    while True:
-        print(data_train1.next())
-except StopIteration as e:
-    pass
+#print(data_train2)
+print(type(data_train2))
 
-print("\n\ndata2\n\n")
+print(dir(data_train2))
 
-try:
-    while True:
-        print(data_train2.next())
-except StopIteration as e:
-    pass
-
-
-print("\n\n\n")
-
-print(data_train2.next())
+#try:
+#    while True:
+#        print(data_train1.next())
+#except StopIteration as e:
+#    pass
+#
+#print("\n\ndata2\n\n")
+#
+#try:
+#    while True:
+#        print(data_train2.next())
+#except StopIteration as e:
+#    pass
+#
+#
+#print("\n\n\n")
+#
+#print(data_train2.next())

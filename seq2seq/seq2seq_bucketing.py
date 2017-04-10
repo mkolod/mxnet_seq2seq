@@ -280,11 +280,12 @@ def train(args):
     decoder.reset()
 
     def sym_gen(seq_len):
-        data = mx.sym.Variable('data')
+        data = mx.sym.Variable('src_data')
         label = mx.sym.Variable('softmax_label')
-        src_embed = mx.sym.Embedding(data=data, input_dim=len(src_vocab),
+ 
+        src_embed = mx.sym.Embedding(data=data, input_dim=len(src_vocab), 
                                  output_dim=args.num_embed, name='src_embed') 
-        targ_embed = mx.sym.Embedding(data=label, input_dim=len(targ_vocab),
+        targ_embed = mx.sym.Embedding(data=label, input_dim=len(targ_vocab),    # data=data
                                  output_dim=args.num_embed, name='targ_embed')
 
         encoder.reset()
@@ -319,7 +320,7 @@ def train(args):
 
         pred = mx.sym.SoftmaxOutput(data=pred, label=label, name='softmax')
 
-        return pred, ('data',), ('softmax_label',)
+        return pred, ('src_data',), ('softmax_label',)
 
 
     if args.gpus:
