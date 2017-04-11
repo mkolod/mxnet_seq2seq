@@ -3,6 +3,10 @@ import re
 from unidecode import unidecode
 from collections import namedtuple
 
+Dicts = namedtuple(
+    'Dicts',
+    ['src_vocab', 'inv_src_vocab', 'targ_vocab', 'inv_targ_vocab'])
+
 Dataset = namedtuple(
     'Dataset',
     ['src_sent', 'src_vocab', 'inv_src_vocab', 'targ_sent', 'targ_vocab', 'inv_targ_vocab'])

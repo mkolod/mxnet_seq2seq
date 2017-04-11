@@ -124,8 +124,8 @@ def _normalize_sequence(length, inputs, layout, merge, in_layout=None):
 def get_data2(layout):
 
     train_dataset = get_s2s_data(
-        src_path='./data/europarl-v7.es-en.en_train_small',
-        targ_path='./data/europarl-v7.es-en.es_train_small'
+        src_path='./data/europarl-v7.es-en.en', #_small',
+        targ_path='./data/europarl-v7.es-en.es', #_small'
     )
 
     valid_dataset = get_s2s_data(
@@ -240,7 +240,14 @@ def decoder_unroll(decoder, target_embed, targ_vocab, unroll_length, go_symbol, 
 
 def train(args):
 
+    from time import time
+
+    start = time()
     data_train, data_val, src_vocab, targ_vocab = get_data2('TN')
+
+    end = time()
+    duration = end - start
+    print("\n\ntime for data loading: %f seconds\n\n" % duration)
 
 #    data_train, data_val, src_vocab = get_data('TNC') #TN')
 #    targ_vocab = src_vocab
