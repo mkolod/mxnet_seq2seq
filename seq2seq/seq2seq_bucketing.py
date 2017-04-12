@@ -166,8 +166,9 @@ def get_data2(layout):
             min_len,max_len+increment,increment
         )]
 
-    train_iter = Seq2SeqIter(src_train_sent, src_valid_sent, src_vocab, inv_src_vocab, layout=layout, batch_size=args.batch_size, buckets=all_pairs)
-    valid_iter = Seq2SeqIter(targ_train_sent, targ_valid_sent, targ_vocab, inv_targ_vocab, layout=layout, batch_size=args.batch_size, buckets=all_pairs)
+    train_iter = Seq2SeqIter(dataset.src_train_sent, dataset.targ_train_sent, dataset.src_vocab, dataset.inv_src_vocab, 
+                     dataset.targ_vocab, dataset.inv_targ_vocab, layout=layout, batch_size=args.batch_size, buckets=all_pairs)
+    valid_iter = Seq2SeqIter(src_valid_sent, targ_valid_sent, src_vocab, inv_src_src_vocab, targ_vocab, inv_targ_vocab, layout=layout, batch_size=args.batch_size, buckets=all_pairs)
     train_iter.reset()
     valid_iter.reset()
     

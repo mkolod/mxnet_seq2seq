@@ -39,8 +39,8 @@ def merge_counts(dict1, dict2):
 
 def top_words_train_valid(train_fname, valid_fname, top_k=50000, reserved_tokens=['<UNK>', '<PAD>', '<EOS>', '<GO>']):
 
-    train_counts = word_count(preprocess_lines(train_file))
-    valid_counts = word_count(preprocess_lines(valid_file))
+    train_counts = word_count(preprocess_lines(train_fname))
+    valid_counts = word_count(preprocess_lines(valid_fname))
     counts   = merge_counts(train_counts, valid_counts)
 
     del train_counts
@@ -78,7 +78,7 @@ def get_s2s_data(src_train_path, src_valid_path, targ_train_path, targ_valid_pat
 	src_train_sent, _ = tokenize_text(src_train_path, vocab=src_dict)
         src_valid_sent, _ = tokenize_text(src_valid_path, vocab=src_dict)
 
-        for i in range(reserved_tokens):
+        for i in range(len(reserved_tokens)):
             src_dict[reserved_tokens[i]] = i
             
 	inv_src_dict = invert_dict(src_dict)
@@ -86,14 +86,14 @@ def get_s2s_data(src_train_path, src_valid_path, targ_train_path, targ_valid_pat
         targ_dict = top_words_train_valid(targ_train_path, targ_valid_path)
 
 	targ_train_sent, _ = tokenize_text(targ_train_path, vocab=targ_dict)
-        targ_valid_sent, _ = tokenize_texT(targ_valid_path, vocab=targ_dict)
+        targ_valid_sent, _ = tokenize_text(targ_valid_path, vocab=targ_dict)
 
-        for i in range(reserved_tokens):
+        for i in range(len(reserved_tokens)):
             targ_dict[reserved_tokens[i]] = i
   
         inv_targ_dict = invert_dict(targ_dict)
 
 	return Dataset(
-		src_train_sent=src_train_sent, src_valid_sent=src_valid_sent, src_vocab=src_vocab, inv_src_vocab=inv_src_vocab,
-		targ_train_sent=targ_train_sent, targ_valid_sent=targ_valid_sent, targ_vocab=targ_vocab, inv_targ_vocab=inv_targ_vocab)
+		src_train_sent=src_train_sent, src_valid_sent=src_valid_sent, src_vocab=src_dict, inv_src_vocab=inv_src_dict,
+		targ_train_sent=targ_train_sent, targ_valid_sent=targ_valid_sent, targ_vocab=targ_dict, inv_targ_vocab=inv_targ_dict)
 

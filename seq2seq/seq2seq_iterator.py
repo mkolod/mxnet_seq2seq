@@ -27,11 +27,13 @@ class Seq2SeqIter(DataIter):
             offset2 = np.where(self.y[offset1:] >= len(target))[0]        
             return self.buckets[offset1 + offset2[0]]     
 
-#    train_iter = Seq2SeqIter(src_train_sent, src_valid_sent, src_vocab, inv_src_vocab, layout=layout, batch_size=args.batch_size, buckets=all_pairs)
-#    valid_iter = Seq2SeqIter(targ_train_sent, targ_valid_sent, targ_vocab, inv_targ_vocab, layout=layout, batch_size=args.batch_size, buckets=all_pa
+# train_iter = Seq2SeqIter(src_train_sent, targ_train_sent, src_vocab, inv_src_vocab, targ_vocab, inv_targ_vocab, layout=layout, batch_size=args.batch_size, buckets=all_pairs)
+# valid_iter = Seq2SeqIter(src_valid_sent, targ_valid_sent, src_vocab, inv_src_src_vocab, targ_vocab, inv_targ_vocab layout=layout, batch_size=args.batch_size, buckets=all_pairs)
+
     
     def __init__(
-        self, dataset, buckets=None, batch_size=32, max_sent_len=None,
+        self, src_sent, targ_sent, src_vocab, inv_src_vocab, targ_vocab, inv_targ_vocab,
+        buckets=None, batch_size=32, max_sent_len=None,
         src_data_name='src_data', targ_data_name='targ_data',
         label_name='softmax_label', dtype=np.int32, layout='TN'):
         self.src_data_name = src_data_name
@@ -40,8 +42,11 @@ class Seq2SeqIter(DataIter):
         self.dtype = dtype
         self.layout = layout
         self.batch_size = batch_size
-        self.train_sent = dataset.src_sent
-        self.targ_sent = dataset.targ_sent
+        self.src_sent = src_sent
+        self.targ_sent = targ_sent
+        self.src_vocab = src_vocab
+        self.inv_src_vocab = inv_src_vocab
+        self.targ_vocab = inv_targ_vocab
         if buckets:
             z = zip(*buckets)
             self.max_sent_len = max(max(z[0]), max(z[1]))
@@ -49,7 +54,7 @@ class Seq2SeqIter(DataIter):
             self.max_sent_len = max_sent_len
         if self.max_sent_len:
             self.train_sent, self.targ_sent = self.filter_long_sent(
-                self.train_sent, self.targ_sent, self.max_sent_len) 
+                self.src_sent, self.targ_sent, self.max_sent_len) 
         self.src_vocab = dataset.src_vocab
         self.targ_vocab = dataset.targ_vocab
         self.inv_src_vocab = dataset.inv_src_vocab
