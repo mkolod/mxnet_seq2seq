@@ -47,7 +47,7 @@ def top_words_train_valid(train_fname, valid_fname, top_k=50000, reserved_tokens
     del valid_counts
 
     sorted_x = sorted(counts.items(), key=operator.itemgetter(1), reverse=True)
-    sorted_x = map(lambda x: x[0], sorted_x[:top_k])
+    sorted_x = map(lambda x: x[0], sorted_x) #sorted_x[:top_k])
     start_idx = len(reserved_tokens)
     sorted_x = zip(sorted_x, range(start_idx, len(sorted_x) + start_idx))
     # value 0 is reserved for <UNK> or its semantic equivalent
@@ -73,9 +73,12 @@ def tokenize_text(path, vocab, invalid_label=0, start_label=4):
 def get_s2s_data(src_train_path, src_valid_path, targ_train_path, targ_valid_path,
          reserved_tokens=['<UNK>', '<PAD>', '<EOS>', '<GO>']):
 
+        print("Creating joint source dictionary")
         src_dict = top_words_train_valid(src_train_path, src_valid_path)
-        
+       
+        print("Tokenizing src_train_path") 
 	src_train_sent, _ = tokenize_text(src_train_path, vocab=src_dict)
+        print("Tokenizing targ_train_path")
         src_valid_sent, _ = tokenize_text(src_valid_path, vocab=src_dict)
 
         for i in range(len(reserved_tokens)):
@@ -83,9 +86,12 @@ def get_s2s_data(src_train_path, src_valid_path, targ_train_path, targ_valid_pat
             
 	inv_src_dict = invert_dict(src_dict)
 
+        print("Creating joint target dictionary")
         targ_dict = top_words_train_valid(targ_train_path, targ_valid_path)
 
+        print("Tokenizing targ_train_path")
 	targ_train_sent, _ = tokenize_text(targ_train_path, vocab=targ_dict)
+        print("Tokenizing targ_valid_path")
         targ_valid_sent, _ = tokenize_text(targ_valid_path, vocab=targ_dict)
 
         for i in range(len(reserved_tokens)):
