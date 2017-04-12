@@ -142,12 +142,12 @@ def get_data2(layout):
 #		src_train_sent=src_train_sent, src_valid_sent=src_valid_sent, src_vocab=src_vocab, inv_src_vocab=inv_src_vocab,
 #		targ_train_sent=targ_train_sent, targ_valid_sent=targ_valid_sent, targ_vocab=targ_vocab, inv_targ_vocab=inv_targ_vocab)
 
-    dataset = get_s2s_data(
-        src_train_path='./data/europarl-v7.es-en.en_train_smaller',
-        src_valid_path='./data/europarl-v7.es-en.en_train_smaller', # valid_small',
-        targ_train_path='./data/europarl-v7.es-en.es_train_smaller',
-        targ_valid_path='./data/europarl-v7.es-en.es_train_smaller' # valid_small'
-    )
+#    dataset = get_s2s_data(
+#        src_train_path='./data/europarl-v7.es-en.en_train_smaller',
+#        src_valid_path='./data/europarl-v7.es-en.en_train_smaller', # valid_small',
+#        targ_train_path='./data/europarl-v7.es-en.es_train_smaller',
+#        targ_valid_path='./data/europarl-v7.es-en.es_train_smaller' # valid_small'
+#    )
 
 #    train_src_sent = train_dataset.src_sent
 #    train_targ_sent = train_dataset.targ_sent
@@ -156,27 +156,33 @@ def get_data2(layout):
 #    max_len = lambda x: max(sent_len(x))
 #    min_len = lambda x: min(sent_len(x))
 
-    min_len = 5 #min(min(sent_len(train_src_sent)), min(sent_len(train_targ_sent)))
 
-    max_len = 65
-    increment = 5
+   
 
-    all_pairs = [(i, j) for i in xrange(
-            min_len,max_len+increment,increment
-        ) for j in xrange(
-            min_len,max_len+increment,increment
-        )]
+#    min_len = 5 #min(min(sent_len(train_src_sent)), min(sent_len(train_targ_sent)))
 
-    train_iter = Seq2SeqIter(dataset.src_train_sent, dataset.targ_train_sent, dataset.src_vocab, dataset.inv_src_vocab, 
-                     dataset.targ_vocab, dataset.inv_targ_vocab, layout=layout, batch_size=args.batch_size, buckets=all_pairs)
+#    max_len = 65
+#    increment = 5
 
-    print("Serializing train iterator")
-    with open('foo.pkl', 'w') as f:
-        pickle.dump(train_iter, f)
-    print("Done serializing train iterator")
+#    all_pairs = [(i, j) for i in xrange(
+#            min_len,max_len+increment,increment
+#        ) for j in xrange(
+#            min_len,max_len+increment,increment
+#        )]
+
+#    train_iter = Seq2SeqIter(dataset.src_train_sent, dataset.targ_train_sent, dataset.src_vocab, dataset.inv_src_vocab, 
+#                     dataset.targ_vocab, dataset.inv_targ_vocab, layout=layout, batch_size=args.batch_size, buckets=all_pairs)
+
   
-    valid_iter = Seq2SeqIter(dataset.src_valid_sent, dataset.targ_valid_sent, dataset.src_vocab, dataset.inv_src_vocab, 
-                     dataset.targ_vocab, dataset.inv_targ_vocab, layout=layout, batch_size=args.batch_size, buckets=all_pairs)
+#    valid_iter = Seq2SeqIter(dataset.src_valid_sent, dataset.targ_valid_sent, dataset.src_vocab, dataset.inv_src_vocab, 
+#                     dataset.targ_vocab, dataset.inv_targ_vocab, layout=layout, batch_size=args.batch_size, buckets=all_pairs)
+
+    with open('train_iter.pkl', 'r') as f:
+        train_iter = pickle.load(f)
+
+    with open('valid_iter.pkl', 'r') as f:
+        valid_iter = pickle.load(f)
+
     train_iter.reset()
     valid_iter.reset()
     

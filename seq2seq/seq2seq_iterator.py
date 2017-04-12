@@ -25,24 +25,8 @@ class TwoDBisect:
         offset2 = np.where(self.y[offset1:] >= len(target))[0]        
         return self.buckets[offset1 + offset2[0]]     
 
-
 class Seq2SeqIter(DataIter):
 
-#    class TwoDBisect:
-#        def __init__(self, buckets):
-#            self.buckets = sorted(buckets, key=operator.itemgetter(0, 1))
-#            self.x, self.y = zip(*buckets)
-#            self.x, self.y = np.array(list(self.x)), np.array(list(self.y))
-#
-#        def twod_bisect(self, source, target):    
-#            offset1 = np.searchsorted(self.x, len(source), side='left')
-#            offset2 = np.where(self.y[offset1:] >= len(target))[0]        
-#            return self.buckets[offset1 + offset2[0]]     
-
-# train_iter = Seq2SeqIter(src_train_sent, targ_train_sent, src_vocab, inv_src_vocab, targ_vocab, inv_targ_vocab, layout=layout, batch_size=args.batch_size, buckets=all_pairs)
-# valid_iter = Seq2SeqIter(src_valid_sent, targ_valid_sent, src_vocab, inv_src_src_vocab, targ_vocab, inv_targ_vocab layout=layout, batch_size=args.batch_size, buckets=all_pairs)
-
-    
     def __init__(
         self, src_sent, targ_sent, src_vocab, inv_src_vocab, targ_vocab, inv_targ_vocab,
         buckets=None, batch_size=32, max_sent_len=None,
