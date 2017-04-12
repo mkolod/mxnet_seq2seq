@@ -200,7 +200,7 @@ def get_data2(layout):
     valid_iter = Seq2SeqIter(dataset.src_valid_sent, dataset.targ_valid_sent, dataset.src_vocab, dataset.inv_src_vocab, 
                      dataset.targ_vocab, dataset.inv_targ_vocab, layout=layout, batch_size=args.batch_size, buckets=all_pairs)
 
-    duration = time()
+    duration = time() - start
     print("Generating iterators took %.2f seconds" % duration)
 
 #    with open('train_iter.pkl', 'r') as f:
