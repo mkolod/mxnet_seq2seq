@@ -1,6 +1,7 @@
 import numpy as np
 import mxnet as mx
 import argparse
+import dill as pickle
 
 import re
 from unidecode import unidecode
@@ -142,10 +143,10 @@ def get_data2(layout):
 #		targ_train_sent=targ_train_sent, targ_valid_sent=targ_valid_sent, targ_vocab=targ_vocab, inv_targ_vocab=inv_targ_vocab)
 
     dataset = get_s2s_data(
-        src_train_path='./data/europarl-v7.es-en.en_train_small',
-        src_valid_path='./data/europarl-v7.es-en.en_valid_small',
-        targ_train_path='./data/europarl-v7.es-en.es_train_small',
-        targ_valid_path='./data/europarl-v7.es-en.es_valid_small'
+        src_train_path='./data/europarl-v7.es-en.en_train_smaller',
+        src_valid_path='./data/europarl-v7.es-en.en_train_smaller', # valid_small',
+        targ_train_path='./data/europarl-v7.es-en.es_train_smaller',
+        targ_valid_path='./data/europarl-v7.es-en.es_train_smaller' # valid_small'
     )
 
 #    train_src_sent = train_dataset.src_sent
@@ -168,6 +169,12 @@ def get_data2(layout):
 
     train_iter = Seq2SeqIter(dataset.src_train_sent, dataset.targ_train_sent, dataset.src_vocab, dataset.inv_src_vocab, 
                      dataset.targ_vocab, dataset.inv_targ_vocab, layout=layout, batch_size=args.batch_size, buckets=all_pairs)
+
+    print("Serializing train iterator")
+    with open('foo.pkl', 'w') as f:
+        pickle.dump(train_iter, f)
+    print("Done serializing train iterator")
+  
     valid_iter = Seq2SeqIter(dataset.src_valid_sent, dataset.targ_valid_sent, dataset.src_vocab, dataset.inv_src_vocab, 
                      dataset.targ_vocab, dataset.inv_targ_vocab, layout=layout, batch_size=args.batch_size, buckets=all_pairs)
     train_iter.reset()

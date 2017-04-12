@@ -14,18 +14,30 @@ import pickle
 import re
 import warnings
 
+class TwoDBisect:
+    def __init__(self, buckets):
+        self.buckets = sorted(buckets, key=operator.itemgetter(0, 1))
+        self.x, self.y = zip(*buckets)
+        self.x, self.y = np.array(list(self.x)), np.array(list(self.y))
+
+    def twod_bisect(self, source, target):    
+        offset1 = np.searchsorted(self.x, len(source), side='left')
+        offset2 = np.where(self.y[offset1:] >= len(target))[0]        
+        return self.buckets[offset1 + offset2[0]]     
+
+
 class Seq2SeqIter(DataIter):
 
-    class TwoDBisect:
-        def __init__(self, buckets):
-            self.buckets = sorted(buckets, key=operator.itemgetter(0, 1))
-            self.x, self.y = zip(*buckets)
-            self.x, self.y = np.array(list(self.x)), np.array(list(self.y))
-
-        def twod_bisect(self, source, target):    
-            offset1 = np.searchsorted(self.x, len(source), side='left')
-            offset2 = np.where(self.y[offset1:] >= len(target))[0]        
-            return self.buckets[offset1 + offset2[0]]     
+#    class TwoDBisect:
+#        def __init__(self, buckets):
+#            self.buckets = sorted(buckets, key=operator.itemgetter(0, 1))
+#            self.x, self.y = zip(*buckets)
+#            self.x, self.y = np.array(list(self.x)), np.array(list(self.y))
+#
+#        def twod_bisect(self, source, target):    
+#            offset1 = np.searchsorted(self.x, len(source), side='left')
+#            offset2 = np.where(self.y[offset1:] >= len(target))[0]        
+#            return self.buckets[offset1 + offset2[0]]     
 
 # train_iter = Seq2SeqIter(src_train_sent, targ_train_sent, src_vocab, inv_src_vocab, targ_vocab, inv_targ_vocab, layout=layout, batch_size=args.batch_size, buckets=all_pairs)
 # valid_iter = Seq2SeqIter(src_valid_sent, targ_valid_sent, src_vocab, inv_src_src_vocab, targ_vocab, inv_targ_vocab layout=layout, batch_size=args.batch_size, buckets=all_pairs)
@@ -62,7 +74,7 @@ class Seq2SeqIter(DataIter):
         # Can't filter smaller counts per bucket if those sentences still exist!
         self.buckets = buckets if buckets else self.gen_buckets(
             self.train_sent, self.targ_sent, filter_smaller_counts_than=1, max_sent_len=max_sent_len)
-        self.bisect = Seq2SeqIter.TwoDBisect(self.buckets)
+        self.bisect = TwoDBisect(self.buckets)
         self.max_sent_len = max_sent_len
         self.pad_id = self.src_vocab['<PAD>']
         self.eos_id = self.src_vocab['<EOS>']
