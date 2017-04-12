@@ -55,10 +55,10 @@ class Seq2SeqIter(DataIter):
         if self.max_sent_len:
             self.train_sent, self.targ_sent = self.filter_long_sent(
                 self.src_sent, self.targ_sent, self.max_sent_len) 
-        self.src_vocab = dataset.src_vocab
-        self.targ_vocab = dataset.targ_vocab
-        self.inv_src_vocab = dataset.inv_src_vocab
-        self.inv_targ_vocab = dataset.inv_targ_vocab
+        self.src_vocab = src_vocab
+        self.targ_vocab = targ_vocab
+        self.inv_src_vocab = inv_src_vocab
+        self.inv_targ_vocab = inv_targ_vocab
         # Can't filter smaller counts per bucket if those sentences still exist!
         self.buckets = buckets if buckets else self.gen_buckets(
             self.train_sent, self.targ_sent, filter_smaller_counts_than=1, max_sent_len=max_sent_len)
