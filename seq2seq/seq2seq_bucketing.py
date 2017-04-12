@@ -5,7 +5,7 @@ import argparse
 import re
 from unidecode import unidecode
 
-from common import tokenize_text, invert_dict, get_s2s_data, Dataset
+from utils import tokenize_text, invert_dict, get_s2s_data, Dataset
 
 from seq2seq_iterator import *
 
@@ -123,24 +123,37 @@ def _normalize_sequence(length, inputs, layout, merge, in_layout=None):
 
 def get_data2(layout):
 
-    train_dataset = get_s2s_data(
-        src_path='./data/europarl-v7.es-en.en', #_small',
-        targ_path='./data/europarl-v7.es-en.es', #_small'
-    )
+#    train_dataset = get_s2s_data(
+#        src_path='./data/europarl-v7.es-en.en_train_small', #_small',
+#        targ_path='./data/europarl-v7.es-en.es_train_small', #_small'
+#    )
 
-    valid_dataset = get_s2s_data(
-        src_path='./data/europarl-v7.es-en.en_train_small',
-        targ_path='./data/europarl-v7.es-en.es_train_small'
+#    valid_dataset = get_s2s_data(
+#        src_path='./data/europarl-v7.es-en.en_train_small',
+#        targ_path='./data/europarl-v7.es-en.es_train_small'
 #        src_vocab = train_dataset.src_vocab,
 #        targ_vocab = train_dataset.targ_vocab
+#    )
+
+
+#src_train_path, src_valid_path, targ_train_path, targ_valid_path,
+#	return Dataset(
+#		src_train_sent=src_train_sent, src_valid_sent=src_valid_sent, src_vocab=src_vocab, inv_src_vocab=inv_src_vocab,
+#		targ_train_sent=targ_train_sent, targ_valid_sent=targ_valid_sent, targ_vocab=targ_vocab, inv_targ_vocab=inv_targ_vocab)
+
+    dataset = get_s2s_data(
+        src_train_path='./data/europarl-v7.es-en.en_train_small',
+        src_valid_path='./data/europarl-v7.es-en.en_valid_small',
+        targ_train_path='./data/europarl-v7.es-en.es_train_small',
+        targ_valid_path='./data/europarl-v7.es-en.es_valid_small'
     )
 
-    train_src_sent = train_dataset.src_sent
-    train_targ_sent = train_dataset.targ_sent
+#    train_src_sent = train_dataset.src_sent
+#    train_targ_sent = train_dataset.targ_sent
 
-    sent_len = lambda x: map(lambda y: len(y), x)
-    max_len = lambda x: max(sent_len(x))
-    min_len = lambda x: min(sent_len(x))
+#    sent_len = lambda x: map(lambda y: len(y), x)
+#    max_len = lambda x: max(sent_len(x))
+#    min_len = lambda x: min(sent_len(x))
 
     min_len = 5 #min(min(sent_len(train_src_sent)), min(sent_len(train_targ_sent)))
 
@@ -153,8 +166,8 @@ def get_data2(layout):
             min_len,max_len+increment,increment
         )]
 
-    train_iter = Seq2SeqIter(train_dataset, layout=layout, batch_size=args.batch_size, buckets=all_pairs)
-    valid_iter = Seq2SeqIter(valid_dataset, layout=layout, batch_size=args.batch_size, buckets=all_pairs)
+    train_iter = Seq2SeqIter(src_train_sent, src_valid_sent, src_vocab, inv_src_vocab, layout=layout, batch_size=args.batch_size, buckets=all_pairs)
+    valid_iter = Seq2SeqIter(targ_train_sent, targ_valid_sent, targ_vocab, inv_targ_vocab, layout=layout, batch_size=args.batch_size, buckets=all_pairs)
     train_iter.reset()
     valid_iter.reset()
     

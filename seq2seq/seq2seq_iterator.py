@@ -7,7 +7,7 @@ from mxnet.io import DataBatch, DataIter
 from random import shuffle
 from mxnet import ndarray
 
-from common import tokenize_text, invert_dict, get_s2s_data, Dataset
+from utils import tokenize_text, invert_dict, get_s2s_data, Dataset
 
 import operator
 import pickle
@@ -26,6 +26,9 @@ class Seq2SeqIter(DataIter):
             offset1 = np.searchsorted(self.x, len(source), side='left')
             offset2 = np.where(self.y[offset1:] >= len(target))[0]        
             return self.buckets[offset1 + offset2[0]]     
+
+#    train_iter = Seq2SeqIter(src_train_sent, src_valid_sent, src_vocab, inv_src_vocab, layout=layout, batch_size=args.batch_size, buckets=all_pairs)
+#    valid_iter = Seq2SeqIter(targ_train_sent, targ_valid_sent, targ_vocab, inv_targ_vocab, layout=layout, batch_size=args.batch_size, buckets=all_pa
     
     def __init__(
         self, dataset, buckets=None, batch_size=32, max_sent_len=None,
@@ -37,7 +40,7 @@ class Seq2SeqIter(DataIter):
         self.dtype = dtype
         self.layout = layout
         self.batch_size = batch_size
-        self.src_sent = dataset.src_sent
+        self.train_sent = dataset.src_sent
         self.targ_sent = dataset.targ_sent
         if buckets:
             z = zip(*buckets)
@@ -45,22 +48,22 @@ class Seq2SeqIter(DataIter):
         else:
             self.max_sent_len = max_sent_len
         if self.max_sent_len:
-            self.src_sent, self.targ_sent = self.filter_long_sent(
-                self.src_sent, self.targ_sent, self.max_sent_len) 
+            self.train_sent, self.targ_sent = self.filter_long_sent(
+                self.train_sent, self.targ_sent, self.max_sent_len) 
         self.src_vocab = dataset.src_vocab
         self.targ_vocab = dataset.targ_vocab
         self.inv_src_vocab = dataset.inv_src_vocab
         self.inv_targ_vocab = dataset.inv_targ_vocab
         # Can't filter smaller counts per bucket if those sentences still exist!
         self.buckets = buckets if buckets else self.gen_buckets(
-            self.src_sent, self.targ_sent, filter_smaller_counts_than=1, max_sent_len=max_sent_len)
+            self.train_sent, self.targ_sent, filter_smaller_counts_than=1, max_sent_len=max_sent_len)
         self.bisect = Seq2SeqIter.TwoDBisect(self.buckets)
         self.max_sent_len = max_sent_len
         self.pad_id = self.src_vocab['<PAD>']
         self.eos_id = self.src_vocab['<EOS>']
         self.unk_id = self.src_vocab['<UNK>']
         self.go_id  = self.src_vocab['<GO>']
-        # After bucketization, we should probably del self.src_sent and self.targ_sent
+        # After bucketization, we should probably del self.train_sent and self.targ_sent
         # to free up memory.
         self.sorted_keys = None
         self.bucketed_data, self.bucket_idx_to_key = self.bucketize()
@@ -91,7 +94,7 @@ class Seq2SeqIter(DataIter):
     def bucketize(self):
         tuples = []
         ctr = 0
-        for src, targ in zip(self.src_sent, self.targ_sent):
+        for src, targ in zip(self.train_sent, self.targ_sent):
             len_tup = self.bisect.twod_bisect(src, targ)
             tuples.append((src, targ, len_tup))
             
