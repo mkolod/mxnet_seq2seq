@@ -196,6 +196,16 @@ def get_data2(layout):
     train_iter = Seq2SeqIter(dataset.src_train_sent, dataset.targ_train_sent, dataset.src_vocab, dataset.inv_src_vocab, 
                      dataset.targ_vocab, dataset.inv_targ_vocab, layout=layout, batch_size=args.batch_size, buckets=all_pairs)
 
+    bucketed_data = train_iter.bucketed_data
+    del train_iter.bucketed_data
+    with open('train_iter.pkl', 'wb') as f:
+        pickle.dump(train_iter, f, 2)
+    del train_iter
+
+    with open('train_iter.pkl', 'rb') as f:
+        train_iter = pickle.load(f)
+ 
+    train_iter.bucketed_data = bucketed_data
   
     valid_iter = Seq2SeqIter(dataset.src_valid_sent, dataset.targ_valid_sent, dataset.src_vocab, dataset.inv_src_vocab, 
                      dataset.targ_vocab, dataset.inv_targ_vocab, layout=layout, batch_size=args.batch_size, buckets=all_pairs)

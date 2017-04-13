@@ -6,6 +6,8 @@ from itertools import groupby
 from mxnet.io import DataBatch, DataIter
 from random import shuffle
 from mxnet import ndarray
+from time import time
+import uuid
 
 from utils import tokenize_text, invert_dict, get_s2s_data, Dataset
 
@@ -264,26 +266,49 @@ def print_text(iterator, max_examples_per_bucket=100):
     except StopIteration:
         return
 
+def random_uuid_pair():
+    rand_id = lambda: uuid.uuid5(uuid.NAMESPACE_OID, str(time()))
+    return rand_id(), rand_id() 
+
+
+# TODO: try serializing as npz rather than npy
+
+def serialize_list_tup_np_arr(data):
+    mappings = []
+    for entry in data:
+        left, right = entry
+        left_filen, right_filen = random_uuid_pair()
+        mappings.append((left_filen, right_filen))
+        with open(left_filen, 'wb') as f1:
+            np.save(f1, left)
+        with open(right_filen, 'wb') as f2:
+            np.save(f2, right)
+    return mappings
+
+def deserialize_np_arrays(mappings):
+    data = []
+    for entry in mappings:
+        left_fn, right_fn = entry
+        with open(left_fn, 'rb') as f1:
+            left_arr = np.load(f1)
+        with open(left_fn, 'rb') as f2:
+            right_arr = np.load(f2)
+        data.append((left_arr, right_arr))
+    return data            
+
 if __name__ == '__main__':
 
     # Get rid of annoying Python deprecation warnings from built-in JSON encoder
     warnings.filterwarnings("ignore", category=DeprecationWarning)   
 
     dataset = get_s2s_data(
-        src_path='./data/europarl-v7.es-en.en_valid_small',
-        targ_path='./data/europarl-v7.es-en.es_valid_small',
-        start_label=1,
-        invalid_label=0
+        src_train_path='./data/europarl-v7.es-en.en_train_small',
+        src_valid_path='./data/europarl-v7.es-en.en_valid_small', # valid_small',
+        targ_train_path='./data/europarl-v7.es-en.es_train_small',
+        targ_valid_path='./data/europarl-v7.es-en.es_valid_small' # valid_small'
     )
 
-    src_sent = dataset.src_sent
-    targ_sent = dataset.targ_sent
-
-    sent_len = lambda x: map(lambda y: len(y), x)
-    max_len = lambda x: max(sent_len(x))
-    min_len = lambda x: min(sent_len(x))
-
-    min_len = min(min(sent_len(src_sent)), min(sent_len(targ_sent)))
+    min_len = 5
 
     max_len = 65
     increment = 5
@@ -294,6 +319,20 @@ if __name__ == '__main__':
             min_len,max_len+increment,increment
         )]
 
-    i1 = Seq2SeqIter(dataset, buckets=all_pairs, layout='NT')
+    train_iter = Seq2SeqIter(dataset.src_train_sent, dataset.targ_train_sent, dataset.src_vocab, dataset.inv_src_vocab,
+                     dataset.targ_vocab, dataset.inv_targ_vocab, layout='TN', batch_size=32, buckets=all_pairs)
 
-    print_text(i1) 
+    
+    bucketed_data = train_iter.bucketed_data
+    mappings = serialize_list_tup_np_arr(bucketed_data)
+    
+    del bucketed_data
+    start = time()
+    bucketed_data = deserialize_np_arrays(mappings)
+    duration = time() - start
+  
+    print("Deserializing np arrays took %.8 seconds" % duration) 
+
+    print("type(train_iter.bucketed_data): %s" % type(train_iter.bucketed_data))
+    print("type(train_iter.bucketed_data[0]): %s" % type(train_iter.bucketed_data[0]))
+    print("tuple: %s" % str(train_iter.bucketed_data[0]))
