@@ -266,49 +266,45 @@ def print_text(iterator, max_examples_per_bucket=100):
     except StopIteration:
         return
 
-def random_uuid_triplet():
+def random_uuids(count=3):
     rand_id = lambda: uuid.uuid5(uuid.NAMESPACE_OID, str(time()))
-    return [str(rand_id()) for _ in range(3)]
+    return list([str(rand_id()) for _ in range(count)])
 
 # TODO: try serializing as npz rather than npy
 
-def append_ext(name, ext='npy'):
+def append_ext(name, ext='npz'):
     return name + '.' + ext
 
-def serialize_list_tup_np_arr(data, extension='npy'):
+def serialize_list_tup_np_arr(data, extension='npz'):
     mappings = []
     for entry in data:
         src, targ, label = entry
-        uuids = random_uuid_triplet()
-        mappings.append(tuple(uuids))
-        for arr, name in zip([src, targ, label], uuids):
-            with open(append_ext(name), 'wb') as f:
-                np.save(f, arr)
+        uuid = random_uuids()[0]
+        mappings.append(uuid)
+        with open(append_ext(uuid), 'wb') as f:
+            np.savez_compressed(f, src=src, targ=targ, label=label)
+#        for arr, name in zip([src, targ, label], uuids):
+#            with open(append_ext(name), 'wb') as f:
+#                np.save(f, arr)
     return mappings
-
-#        with open(append_ext(src_filen), 'wb') as f1:
-#            np.save(f1, src)
-#        with open(append_ext(targ_filen), 'wb') as f2:
-#            np.save(f2, targ)
-#        with open(append_ext(label_filen), 'wb') as f3:
-#            np.save(f3, label)
-#    return mappings
 
 def deserialize_np_arrays(mappings):
     data = []
     for entry in mappings:
-        left_fn, right_fn = entry
-        with open(left_fn, 'rb') as f1:
-            left_arr = np.load(f1)
-        with open(left_fn, 'rb') as f2:
-            right_arr = np.load(f2)
-        data.append((left_arr, right_arr))
+        with open(append_ext(entry)) as f:
+            npz_file = np.load(f)
+            src = npz_file['src']
+            targ = npz_file['targ']
+            label = npz_file['label']    
+            data.append((src, targ, label))
     return data            
 
 if __name__ == '__main__':
 
     # Get rid of annoying Python deprecation warnings from built-in JSON encoder
     warnings.filterwarnings("ignore", category=DeprecationWarning)   
+ 
+    start = time()
 
     dataset = get_s2s_data(
         src_train_path='./data/europarl-v7.es-en.en_train_small',
@@ -316,6 +312,9 @@ if __name__ == '__main__':
         targ_train_path='./data/europarl-v7.es-en.es_train_small',
         targ_valid_path='./data/europarl-v7.es-en.es_valid_small' # valid_small'
     )
+   
+    preproc_duration = time() - start
+    print("\nPreprocessing data took %.4f seconds\n" % preproc_duration)
 
     min_len = 5
 
@@ -333,17 +332,13 @@ if __name__ == '__main__':
 
     train_iter.reset()   
     bucketed_data = train_iter.bucketed_data
-    print(bucketed_data)
-    print(type(bucketed_data))
     mappings = serialize_list_tup_np_arr(bucketed_data)
     
     del bucketed_data
     start = time()
     bucketed_data = deserialize_np_arrays(mappings)
-    duration = time() - start
+    deser_duration = time() - start
   
-    print("Deserializing np arrays took %.8 seconds" % duration) 
+    print("Deserializing preprocessed NumPy arrays took %.4f seconds\n" % deser_duration) 
 
-    print("type(train_iter.bucketed_data): %s" % type(train_iter.bucketed_data))
-    print("type(train_iter.bucketed_data[0]): %s" % type(train_iter.bucketed_data[0]))
-    print("tuple: %s" % str(train_iter.bucketed_data[0]))
+    print("Speed-up from preprocessing: %.1f times\n" % (preproc_duration / deser_duration))
