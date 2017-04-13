@@ -123,73 +123,7 @@ def _normalize_sequence(length, inputs, layout, merge, in_layout=None):
 
     return inputs, axis
 
-def get_data2(layout):
-
-#    train_dataset = get_s2s_data(
-#        src_path='./data/europarl-v7.es-en.en_train_small', #_small',
-#        targ_path='./data/europarl-v7.es-en.es_train_small', #_small'
-#    )
-
-#    valid_dataset = get_s2s_data(
-#        src_path='./data/europarl-v7.es-en.en_train_small',
-#        targ_path='./data/europarl-v7.es-en.es_train_small'
-#        src_vocab = train_dataset.src_vocab,
-#        targ_vocab = train_dataset.targ_vocab
-#    )
-
-
-#src_train_path, src_valid_path, targ_train_path, targ_valid_path,
-#	return Dataset(
-#		src_train_sent=src_train_sent, src_valid_sent=src_valid_sent, src_vocab=src_vocab, inv_src_vocab=inv_src_vocab,
-#		targ_train_sent=targ_train_sent, targ_valid_sent=targ_valid_sent, targ_vocab=targ_vocab, inv_targ_vocab=inv_targ_vocab)
-
-#    start = time()
-
-#    dataset = get_s2s_data(
-#        src_train_path='./data/europarl-v7.es-en.en_train_small',
-#        src_valid_path='./data/europarl-v7.es-en.en_valid_small', # valid_small',
-#        targ_train_path='./data/europarl-v7.es-en.es_train_small',
-#        targ_valid_path='./data/europarl-v7.es-en.es_valid_small' # valid_small'
-#    )
-    
-#    duration = time() - start
-
-#    print("Parsing text took %.2f seconds" % duration)
-
-#    with open('dataset.pkl', 'wb') as f:
-#        pickle.dump(dataset, f, 2)
- 
-#    del dataset
-
-#    start = time()
-
-#    with open('dataset.pkl', 'rb') as f:
-#        dataset = pickle.load(f)
- 
-#    duration = time() - start
- 
-#    print("Deserializing preprocessed dataset took %.2f seconds" % duration)
-
-#    train_src_sent = train_dataset.src_sent
-#    train_targ_sent = train_dataset.targ_sent
-
-#    sent_len = lambda x: map(lambda y: len(y), x)
-#    max_len = lambda x: max(sent_len(x))
-#    min_len = lambda x: min(sent_len(x))
-
-
-   
-
-#    min_len = 5 #min(min(sent_len(train_src_sent)), min(sent_len(train_targ_sent)))
-
-#    max_len = 65
-#    increment = 5
-
-#    all_pairs = [(i, j) for i in xrange(
-#            min_len,max_len+increment,increment
-#        ) for j in xrange(
-#            min_len,max_len+increment,increment
-#        )]
+def get_data(layout):
 
     start = time()
 
@@ -201,54 +135,10 @@ def get_data2(layout):
 
     print("\nDeserializing training and validation iterators took %.2f seconds\n" % duration)
 
- #   train_iter = Seq2SeqIter(dataset.src_train_sent, dataset.targ_train_sent, dataset.src_vocab, dataset.inv_src_vocab, 
- #                    dataset.targ_vocab, dataset.inv_targ_vocab, layout=layout, batch_size=args.batch_size, buckets=all_pairs)
-
-#    bucketed_data = train_iter.bucketed_data
-#    del train_iter.bucketed_data
-#    with open('train_iter.pkl', 'wb') as f:
-#        pickle.dump(train_iter, f, 2)
-#    del train_iter
-
-#    with open('train_iter.pkl', 'rb') as f:
-#        train_iter = pickle.load(f)
- 
-#    train_iter.bucketed_data = bucketed_data
-  
-#    valid_iter = Seq2SeqIter(dataset.src_valid_sent, dataset.targ_valid_sent, dataset.src_vocab, dataset.inv_src_vocab, 
-#                     dataset.targ_vocab, dataset.inv_targ_vocab, layout=layout, batch_size=args.batch_size, buckets=all_pairs)
-
-#    duration = time() - start
-#    print("Generating iterators took %.2f seconds" % duration)
-
-#    with open('train_iter.pkl', 'r') as f:
-#        train_iter = pickle.load(f)
-
-#    with open('valid_iter.pkl', 'r') as f:
-#        valid_iter = pickle.load(f)
-
-    # train_iter.reset()
-    # valid_iter.reset()
-    
     print("\nSize of src vocab: %d" % len(train_iter.src_vocab))
     print("Size of targ vocab: %d\n" % len(train_iter.targ_vocab))
 
     return train_iter, valid_iter, train_iter.src_vocab, train_iter.targ_vocab
-
-def get_data(layout):
-    source_data = "./data/europarl-v7.es-en.es_train_small"
-    target_data = "./data/europarl-v7.es-en.en_train_small"
-    train_sent, vocab = tokenize_text(source_data, start_label=start_label,
-                                      invalid_label=invalid_label)
-    val_sent, _ = tokenize_text(target_data, vocab=None, start_label=start_label, # vocab, start_label=start_label,
-                                invalid_label=invalid_label)
- 
-    data_train  = mx.rnn.BucketSentenceIter(train_sent, args.batch_size, buckets=buckets,
-                                            invalid_label=invalid_label, layout=layout)
-    data_val    = mx.rnn.BucketSentenceIter(val_sent, args.batch_size, buckets=buckets,
-                                            invalid_label=invalid_label, layout=layout)
-    return data_train, data_val, vocab
-
 
 # WORK IN PROGRESS !!!
 def decoder_unroll(decoder, target_embed, targ_vocab, unroll_length, go_symbol, begin_state=None, layout='TNC', merge_outputs=None):
@@ -286,23 +176,6 @@ def decoder_unroll(decoder, target_embed, targ_vocab, unroll_length, go_symbol, 
             output, states = decoder(inputs[i], states)
             outputs.append(output)
 
-
-#            output, states = decoder(output, states)
-#            outputs.append(output)
-
-#            pred = mx.sym.Reshape(output, shape=(-1, args.num_hidden), name='pred_reshape') 
-#            pred = mx.sym.FullyConnected(data=pred, num_hidden=len(targ_vocab), name='loop_pred')
-#            pred = mx.sym.Reshape(pred, shape=(-1,))
-            # record actual probs for softmax, then get new token for embedding
-#            outputs.append(pred)
-#            output = mx.sym.argmax(pred)
-#            result = output.eval().asnumpy()
-#            new_word_idx = output.forward()
-#            output = output.eval(contexts, data={'pred_word_idx': result})
-#            pred_word_idx.bind(contexts, {'pred_word_idx': output})
-            #print("\ntype(new_word): %s" % type(new_word_idx)) 
-#            output = embed 
-
         print("second normalize sequence")
         print("len(outputs): %d" % len(outputs))
         print("unroll_length: %d" % unroll_length)
@@ -314,15 +187,7 @@ def train(args):
 
     from time import time
 
-    data_train, data_val, src_vocab, targ_vocab = get_data2('TN')
-
-#    data_train, data_val, src_vocab = get_data('TNC') #TN')
-#    targ_vocab = src_vocab
-
-#    print(data_train.next())
-#    print(data_val.next()) 
-
-    print("Dict size: %d" % len(src_vocab))
+    data_train, data_val, src_vocab, targ_vocab = get_data('TN')
 
     encoder = mx.rnn.SequentialRNNCell()
 
@@ -352,8 +217,6 @@ def train(args):
         encoder.reset()
         decoder.reset()
 
-#        enc_seq_len = seq_len
-#        dec_seq_len = seq_len
         enc_seq_len, dec_seq_len = seq_len
 
         layout = 'TNC'
