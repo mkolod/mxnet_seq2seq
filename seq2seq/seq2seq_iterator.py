@@ -266,26 +266,33 @@ def print_text(iterator, max_examples_per_bucket=100):
     except StopIteration:
         return
 
-def random_uuid_pair():
+def random_uuid_triplet():
     rand_id = lambda: uuid.uuid5(uuid.NAMESPACE_OID, str(time()))
-    return rand_id(), rand_id() 
-
+    return [str(rand_id()) for _ in range(3)]
 
 # TODO: try serializing as npz rather than npy
 
-def serialize_list_tup_np_arr(data):
+def append_ext(name, ext='npy'):
+    return name + '.' + ext
+
+def serialize_list_tup_np_arr(data, extension='npy'):
     mappings = []
     for entry in data:
-        print(entry)
-        print(type(entry))
-        left, right = entry
-        left_filen, right_filen = random_uuid_pair()
-        mappings.append((left_filen, right_filen))
-        with open(left_filen, 'wb') as f1:
-            np.save(f1, left)
-        with open(right_filen, 'wb') as f2:
-            np.save(f2, right)
+        src, targ, label = entry
+        uuids = random_uuid_triplet()
+        mappings.append(tuple(uuids))
+        for arr, name in zip([src, targ, label], uuids):
+            with open(append_ext(name), 'wb') as f:
+                np.save(f, arr)
     return mappings
+
+#        with open(append_ext(src_filen), 'wb') as f1:
+#            np.save(f1, src)
+#        with open(append_ext(targ_filen), 'wb') as f2:
+#            np.save(f2, targ)
+#        with open(append_ext(label_filen), 'wb') as f3:
+#            np.save(f3, label)
+#    return mappings
 
 def deserialize_np_arrays(mappings):
     data = []
@@ -324,7 +331,7 @@ if __name__ == '__main__':
     train_iter = Seq2SeqIter(dataset.src_train_sent, dataset.targ_train_sent, dataset.src_vocab, dataset.inv_src_vocab,
                      dataset.targ_vocab, dataset.inv_targ_vocab, layout='TN', batch_size=32, buckets=all_pairs)
 
-    
+    train_iter.reset()   
     bucketed_data = train_iter.bucketed_data
     print(bucketed_data)
     print(type(bucketed_data))
