@@ -6,6 +6,7 @@ from unidecode import unidecode
 from collections import defaultdict
 from time import time
 from collections import namedtuple
+from tqdm import tqdm
 
 Dicts = namedtuple(
     'Dicts',
@@ -21,32 +22,34 @@ def invert_dict(d):
     return {v: k for k, v in d.iteritems()}
 
 def preprocess_lines(fname):
+    print("Reading file: %s" % fname)
     lines = unidecode(open(fname).read().decode('utf-8')).split('\n')
     lines = map(lambda x: filter(lambda y: y != '', re.sub('\s+', ' ', re.sub('([' + string.punctuation + '])', r' \1 ', x) ).split(' ')), lines)
     lines = filter(lambda x: x != [], lines)
     return lines
 
-def word_count(lines, top_k=50000):
+def word_count(lines, top_k=50000, data_name=''):
     counts = defaultdict(long)
-    for line in lines:
+    for line in tqdm(lines, desc='word count (%s)' % data_name):
         for word in line:
             counts[word] += 1
     return counts
 
 def merge_counts(dict1, dict2):
-    return { k: dict1.get(k, 0) + dict2.get(k, 0) for k in set(dict1) | set(dict2) }
+    return { k: dict1.get(k, 0) + dict2.get(k, 0) for k in tqdm(set(dict1) | set(dict2), desc='merge word counts') }
 
 def top_words_train_valid(train_fname, valid_fname, top_k=50000, reserved_tokens=['<UNK>', '<PAD>', '<EOS>', '<GO>']):
 
-    train_counts = word_count(preprocess_lines(train_fname))
-    valid_counts = word_count(preprocess_lines(valid_fname))
+    train_counts = word_count(preprocess_lines(train_fname), data_name='train')
+    valid_counts = word_count(preprocess_lines(valid_fname), data_name='valid')
     counts   = merge_counts(train_counts, valid_counts)
 
     del train_counts
     del valid_counts
 
+    print("Choosing top n words for the dictionary.")
     sorted_x = sorted(counts.items(), key=operator.itemgetter(1), reverse=True)
-    sorted_x = map(lambda x: x[0], sorted_x) #sorted_x[:top_k])
+    sorted_x = map(lambda x: x[0], sorted_x[:top_k])
     start_idx = len(reserved_tokens)
     sorted_x = zip(sorted_x, range(start_idx, len(sorted_x) + start_idx))
     # value 0 is reserved for <UNK> or its semantic equivalent
@@ -66,6 +69,7 @@ def top_words_train_valid(train_fname, valid_fname, top_k=50000, reserved_tokens
 
 def tokenize_text(path, vocab, invalid_label=0, start_label=4):
     lines = preprocess_lines(path)
+    print("Encoding sentences")
     sentences, vocab = mx.rnn.encode_sentences(lines, vocab=vocab, invalid_label=invalid_label, start_label=start_label)
     return sentences, vocab
 
