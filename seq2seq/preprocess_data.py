@@ -53,7 +53,7 @@ if __name__ == '__main__':
 
     train_iter.bucketize()
 
-    train_iter.reset()   
+#    train_iter.reset()   
 
     train_iter.save('./data/train_iterator.pkl')
 
@@ -62,7 +62,7 @@ if __name__ == '__main__':
 
     valid_iter.bucketize()
 
-    valid_iter.reset()   
+#    valid_iter.reset()   
 
     valid_iter.save('./data/valid_iterator.pkl')
 

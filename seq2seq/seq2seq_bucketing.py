@@ -127,16 +127,52 @@ def get_data(layout):
 
     start = time()
 
-    train_iter = Seq2SeqIter.load('./data/train_iterator.pkl')
+    dataset = get_s2s_data(
+        src_train_path='./data/europarl-v7.es-en.en_train_small',
+        src_valid_path='./data/europarl-v7.es-en.en_valid_small', # valid_small',
+        targ_train_path='./data/europarl-v7.es-en.es_train_small',
+        targ_valid_path='./data/europarl-v7.es-en.es_valid_small' # valid_small'
+    )
 
-    valid_iter = Seq2SeqIter.load('./data/valid_iterator.pkl')
+    preproc_duration = time() - start
+    print("\nPreprocessing data took %.4f seconds\n" % preproc_duration)
 
-    duration = time() - start
+    min_len = 5
 
-    print("\nDeserializing training and validation iterators took %.2f seconds\n" % duration)
+    max_len = 65
+    increment = 5
 
-    print("\nSize of src vocab: %d" % len(train_iter.src_vocab))
-    print("Size of targ vocab: %d\n" % len(train_iter.targ_vocab))
+    all_pairs = [(i, j) for i in xrange(
+            min_len,max_len+increment,increment
+        ) for j in xrange(
+            min_len,max_len+increment,increment
+        )]
+
+
+    print("Constructing train iterator")
+    train_iter = Seq2SeqIter(dataset.src_train_sent, dataset.targ_train_sent, dataset.src_vocab, dataset.inv_src_vocab,
+                     dataset.targ_vocab, dataset.inv_targ_vocab, layout='TN', batch_size=32, buckets=all_pairs)
+
+    train_iter.bucketize()
+
+#    train_iter.reset()   
+
+    print("Constructing valid iterator")
+    valid_iter = Seq2SeqIter(dataset.src_valid_sent, dataset.targ_valid_sent, dataset.src_vocab, dataset.inv_src_vocab,
+                     dataset.targ_vocab, dataset.inv_targ_vocab, layout='TN', batch_size=32, buckets=all_pairs)
+
+    valid_iter.bucketize()
+
+#    train_iter = Seq2SeqIter.load('./data/train_iterator.pkl')
+
+#    valid_iter = Seq2SeqIter.load('./data/valid_iterator.pkl')
+
+#    duration = time() - start
+
+#    print("\nDeserializing training and validation iterators took %.2f seconds\n" % duration)
+
+#    print("\nSize of src vocab: %d" % len(train_iter.src_vocab))
+#    print("Size of targ vocab: %d\n" % len(train_iter.targ_vocab))
 
     return train_iter, valid_iter, train_iter.src_vocab, train_iter.targ_vocab
 
