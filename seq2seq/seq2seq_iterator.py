@@ -8,11 +8,13 @@ from random import shuffle
 from mxnet import ndarray
 from time import time
 import uuid
+import os
+from tqdm import tqdm
 
 from utils import tokenize_text, invert_dict, get_s2s_data, Dataset
 
 import operator
-import pickle
+import dill as pickle
 import re
 import warnings
 
@@ -69,30 +71,33 @@ class Seq2SeqIter(DataIter):
         # After bucketization, we should probably del self.train_sent and self.targ_sent
         # to free up memory.
         self.sorted_keys = None
-        self.bucketed_data, self.bucket_idx_to_key = self.bucketize()
-        self.bucket_key_to_idx = invert_dict(dict(enumerate(self.bucket_idx_to_key)))
+        self.bucketed_data = None
+        self.bucket_idx_to_key = None
+        #  self.bucketize()
+        self.bucket_key_to_idx = None
         self.interbucket_idx = -1
         self.curr_bucket_id = None
         self.curr_chunks = None
         self.curr_buck = None
         self.switch_bucket = True
-        self.num_buckets = len(self.bucket_idx_to_key)
-        self.bucket_iterator_indices = list(range(self.num_buckets))
-        self.default_bucket_key = self.sorted_keys[-1]
-
-        if self.layout == 'TN':
-            self.provide_data = [
-                mx.io.DataDesc(self.src_data_name, (self.default_bucket_key[0], self.batch_size), layout='TN'),
-                mx.io.DataDesc(self.targ_data_name, (self.default_bucket_key[0], self.batch_size), layout='TN')
-            ]
-            self.provide_label = [mx.io.DataDesc(self.label_name, (self.default_bucket_key[1], self.batch_size), layout='TN')] 
-        elif self.layout == 'NT':
-            self.provide_data = [
-                (self.src_data_name, (self.batch_size, self.default_bucket_key[0])),
-                (self.targ_data_name, (self.batch_size, self.default_bucket_key[0]))]
-            self.provide_label = [(self.label_name, (self.batch_size, self.default_bucket_key[1]))]
-        else:
-            raise ValueError("Invalid layout %s: Must by NT (batch major) or TN (time major)")
+        self.num_buckets = -1
+        self.bucket_iterator_indices = []
+        self.default_bucket_key = -1
+        self.mappings = None
+#
+#        if self.layout == 'TN':
+#            self.provide_data = [
+#                mx.io.DataDesc(self.src_data_name, (self.default_bucket_key[0], self.batch_size), layout='TN'),
+#                mx.io.DataDesc(self.targ_data_name, (self.default_bucket_key[0], self.batch_size), layout='TN')
+#            ]
+#            self.provide_label = [mx.io.DataDesc(self.label_name, (self.default_bucket_key[1], self.batch_size), layout='TN')] 
+#        elif self.layout == 'NT':
+#            self.provide_data = [
+#                (self.src_data_name, (self.batch_size, self.default_bucket_key[0])),
+#                (self.targ_data_name, (self.batch_size, self.default_bucket_key[0]))]
+#            self.provide_label = [(self.label_name, (self.batch_size, self.default_bucket_key[1]))]
+#        else:
+#            raise ValueError("Invalid layout %s: Must by NT (batch major) or TN (time major)")
     
     def bucketize(self):
         tuples = []
@@ -104,8 +109,8 @@ class Seq2SeqIter(DataIter):
         sorted_keys = sorted(tuples, key=operator.itemgetter(2))
         grouped = groupby(sorted_keys, lambda x: x[2])
         self.sorted_keys = map(lambda x: x[2], sorted_keys)
-        bucketed_data = [] 
-        bucket_idx_to_key = []
+        self.bucketed_data = [] 
+        self.bucket_idx_to_key = []
         
         for group in grouped:
             
@@ -131,13 +136,38 @@ class Seq2SeqIter(DataIter):
                 new_label[idx, 0:len(curr_targ)] = curr_targ
                 new_label[idx, len(curr_targ)] = self.eos_id
                             
-            bucketed_data.append((new_src, new_targ, new_label))
+            self.bucketed_data.append((new_src, new_targ, new_label))
 
-            bucket_idx_to_key.append((key[0], key[1]+1))
-        return bucketed_data, bucket_idx_to_key
+            self.bucket_idx_to_key.append((key[0], key[1]+1))
+
+
+        self.bucket_key_to_idx = invert_dict(dict(enumerate(self.bucket_idx_to_key)))
+        self.interbucket_idx = -1
+        self.curr_bucket_id = None
+        self.curr_chunks = None
+        self.curr_buck = None
+        self.switch_bucket = True
+        self.num_buckets = len(self.bucket_idx_to_key)
+        self.bucket_iterator_indices = list(range(self.num_buckets))
+        self.default_bucket_key = self.sorted_keys[-1]
+
+        if self.layout == 'TN':
+            self.provide_data = [
+                mx.io.DataDesc(self.src_data_name, (self.default_bucket_key[0], self.batch_size), layout='TN'),
+                mx.io.DataDesc(self.targ_data_name, (self.default_bucket_key[0], self.batch_size), layout='TN')
+            ]
+            self.provide_label = [mx.io.DataDesc(self.label_name, (self.default_bucket_key[1], self.batch_size), layout='TN')]
+        elif self.layout == 'NT':
+            self.provide_data = [
+                (self.src_data_name, (self.batch_size, self.default_bucket_key[0])),
+                (self.targ_data_name, (self.batch_size, self.default_bucket_key[0]))]
+            self.provide_label = [(self.label_name, (self.batch_size, self.default_bucket_key[1]))]
+        else:
+            raise ValueError("Invalid layout %s: Must by NT (batch major) or TN (time major)")
+
+#        return bucketed_data, bucket_idx_to_key
     
     def current_bucket_key(self):
-
         return self.bucket_idx_to_key[self.interbucket_idx]
     
     def current_bucket_index(self):
@@ -156,6 +186,60 @@ class Seq2SeqIter(DataIter):
             label = label[indices]
             self.bucketed_data[idx] = (src, targ, label)
         shuffle(self.bucket_iterator_indices)
+
+    @staticmethod
+    def _normalize_path(path, name, ext='npz'):
+        path = os.path.normpath(path) + os.sep
+        return path + name + '.' + ext
+
+    def save(self, file_path):
+        if not self.bucketed_data:
+            raise Exception("Bucketed data does not exist. First run bucketize() on the iterator to create buckets.")
+        bucketed_data = self.bucketed_data
+        del self.bucketed_data
+        print("Saving metadata.")
+        directory = os.path.dirname(file_path) 
+        with open(file_path, 'wb') as f:
+            pickle.dump(self, f, 2)
+        print("Metadata saved.")
+        print("Saving NumPy arrays.")
+        self._serialize_list_tup_np_arr(bucketed_data, directory)        
+        print("Done saving NumPy arrays.")
+        
+    @staticmethod
+    def load():
+        # Load metadata file.
+        # Get mappings from the instantiated object.
+        # Load NumPy arrays to bucketed_data.
+        # Create inverse lookup of buckets.
+        # Remove the mappings fom the Seq2SeqIter instance.
+        # Return Seq2SeqIter instance. 
+        pass
+
+    @staticmethod
+    def _random_uuid():
+        return str(uuid.uuid5(uuid.NAMESPACE_OID, str(time())))
+
+    def _serialize_list_tup_np_arr(self, data, path, extension='npz'):
+        self.mappings = []
+        for entry in tqdm(data, desc='Saving NumPy arrays'):
+            src, targ, label = entry
+            uuid = Seq2SeqIter._random_uuid()
+            self.mappings.append(uuid)
+            with open(Seq2SeqIter._normalize_path(path, uuid), 'wb') as f:
+                np.savez_compressed(f, src=src, targ=targ, label=label)
+
+    def _deserialize_np_arrays(mappings, path):
+        data = []
+        for entry in mappings:
+            with open(normalize_path(path, entry)) as f:
+                npz_file = np.load(f)
+                src = npz_file['src']
+                targ = npz_file['targ']
+                label = npz_file['label']
+            data.append((src, targ, label))
+        return data
+ 
 
     # iterate over data
     def next(self):
@@ -330,15 +414,20 @@ if __name__ == '__main__':
     train_iter = Seq2SeqIter(dataset.src_train_sent, dataset.targ_train_sent, dataset.src_vocab, dataset.inv_src_vocab,
                      dataset.targ_vocab, dataset.inv_targ_vocab, layout='TN', batch_size=32, buckets=all_pairs)
 
-    train_iter.reset()   
-    bucketed_data = train_iter.bucketed_data
-    mappings = serialize_list_tup_np_arr(bucketed_data)
-    
-    del bucketed_data
-    start = time()
-    bucketed_data = deserialize_np_arrays(mappings)
-    deser_duration = time() - start
-  
-    print("Deserializing preprocessed NumPy arrays took %.4f seconds\n" % deser_duration) 
+    train_iter.bucketize()
 
-    print("Speed-up from preprocessing: %.1f times\n" % (preproc_duration / deser_duration))
+    train_iter.reset()   
+
+    train_iter.save('iterator.pkl')
+
+#    bucketed_data = train_iter.bucketed_data
+#    mappings = serialize_list_tup_np_arr(bucketed_data)
+    
+#    del bucketed_data
+#    start = time()
+#    bucketed_data = deserialize_np_arrays(mappings)
+#    deser_duration = time() - start
+  
+#    print("Deserializing preprocessed NumPy arrays took %.4f seconds\n" % deser_duration) 
+
+#    print("Speed-up from preprocessing: %.1f times\n" % (preproc_duration / deser_duration))
