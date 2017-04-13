@@ -28,7 +28,7 @@ def preprocess_lines(fname):
     lines = filter(lambda x: x != [], lines)
     return lines
 
-def word_count(lines, top_k=50000, data_name=''):
+def word_count(lines, data_name=''):
     counts = defaultdict(long)
     for line in tqdm(lines, desc='word count (%s)' % data_name):
         for word in line:
@@ -49,7 +49,7 @@ def top_words_train_valid(train_fname, valid_fname, top_k=50000, reserved_tokens
 
     print("Choosing top n words for the dictionary.")
     sorted_x = sorted(counts.items(), key=operator.itemgetter(1), reverse=True)
-    sorted_x = map(lambda x: x[0], sorted_x[:top_k])
+    sorted_x = map(lambda x: x[0], sorted_x) # sorted_x[:top_k])
     start_idx = len(reserved_tokens)
     sorted_x = zip(sorted_x, range(start_idx, len(sorted_x) + start_idx))
     # value 0 is reserved for <UNK> or its semantic equivalent
