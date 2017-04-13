@@ -127,9 +127,9 @@ def get_data(layout):
 
     start = time()
 
-    train_iter = Seq2SeqIter.load('train_iterator.pkl')
+    train_iter = Seq2SeqIter.load('./data/train_iterator.pkl')
 
-    valid_iter = Seq2SeqIter.load('valid_iterator.pkl')
+    valid_iter = Seq2SeqIter.load('./data/valid_iterator.pkl')
 
     duration = time() - start
 
