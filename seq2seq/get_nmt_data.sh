@@ -1,8 +1,10 @@
 #!/bin/bash
 mkdir -p data/
 cd data/ 
-#wget http://statmt.org/europarl/v7/es-en.tgz
-#tar xvf es-en.tgz && rm es-en.tgz
+
+# check if exists and use cached version
+wget http://statmt.org/europarl/v7/es-en.tgz
+tar xvf es-en.tgz && rm es-en.tgz
 
 TRAIN_SENT_CT=100000
 VAL_SENT_CT=1000
