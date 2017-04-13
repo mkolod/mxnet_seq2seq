@@ -276,6 +276,8 @@ def random_uuid_pair():
 def serialize_list_tup_np_arr(data):
     mappings = []
     for entry in data:
+        print(entry)
+        print(type(entry))
         left, right = entry
         left_filen, right_filen = random_uuid_pair()
         mappings.append((left_filen, right_filen))
@@ -324,6 +326,8 @@ if __name__ == '__main__':
 
     
     bucketed_data = train_iter.bucketed_data
+    print(bucketed_data)
+    print(type(bucketed_data))
     mappings = serialize_list_tup_np_arr(bucketed_data)
     
     del bucketed_data
