@@ -55,7 +55,7 @@ if __name__ == '__main__':
 
     train_iter.reset()   
 
-    train_iter.save('./preproc_data/train_iterator.pkl')
+    train_iter.save('./data/train_iterator.pkl')
 
     valid_iter = Seq2SeqIter(dataset.src_valid_sent, dataset.targ_valid_sent, dataset.src_vocab, dataset.inv_src_vocab,
                      dataset.targ_vocab, dataset.inv_targ_vocab, layout='TN', batch_size=32, buckets=all_pairs)
@@ -64,5 +64,5 @@ if __name__ == '__main__':
 
     valid_iter.reset()   
 
-    valid_iter.save('./preproc_data/valid_iterator.pkl')
+    valid_iter.save('./data/valid_iterator.pkl')
 
