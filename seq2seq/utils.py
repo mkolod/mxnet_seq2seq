@@ -2,7 +2,6 @@ import mxnet as mx
 import re
 import operator
 import string
-import dill as pickle
 from unidecode import unidecode
 from collections import defaultdict
 from time import time

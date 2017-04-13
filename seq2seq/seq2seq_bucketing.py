@@ -1,7 +1,7 @@
 import numpy as np
 import mxnet as mx
 import argparse
-import cPickle as pickle
+import dill as pickle
 
 from time import time
 import re
