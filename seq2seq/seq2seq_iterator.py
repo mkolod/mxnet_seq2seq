@@ -196,25 +196,34 @@ class Seq2SeqIter(DataIter):
         if not self.bucketed_data:
             raise Exception("Bucketed data does not exist. First run bucketize() on the iterator to create buckets.")
         bucketed_data = self.bucketed_data
-        del self.bucketed_data
-        print("Saving metadata.")
         directory = os.path.dirname(file_path) 
-        with open(file_path, 'wb') as f:
-            pickle.dump(self, f, 2)
-        print("Metadata saved.")
+        self.bucketed_data = None
+        # Note: This has to come before metadata to store mappings in the Seq2SeqIter instance.
         print("Saving NumPy arrays.")
         self._serialize_list_tup_np_arr(bucketed_data, directory)        
         print("Done saving NumPy arrays.")
+        print("Saving metadata.")
+        with open(file_path, 'wb') as f:
+            pickle.dump(self, f, 2)
+        print("Metadata saved.")
         
     @staticmethod
-    def load():
-        # Load metadata file.
-        # Get mappings from the instantiated object.
-        # Load NumPy arrays to bucketed_data.
+    def load(metadata_path):
+        directory = os.path.dirname(metadata_path)
+        with open(metadata_path, 'rb') as f:
+            iterator = pickle.load(f)
+        iterator._deserialize_np_arrays(directory)
+        iterator.mappings = None
         # Create inverse lookup of buckets.
-        # Remove the mappings fom the Seq2SeqIter instance.
-        # Return Seq2SeqIter instance. 
-        pass
+        # If TN, ba
+        #src_ex.shape[0], src_ex.shape[1])
+        iterator.bucket_idx_to_key = []
+        for bucket in iterator.bucketed_data:
+            src_len = np.shape(bucket[0])[1]
+            label_len = np.shape(bucket[2])[1]
+            iterator.bucket_idx_to_key.append((src_len, label_len))
+        iterator.bucket_key_to_idx = invert_dict(dict(enumerate(iterator.bucket_idx_to_key)))
+        return iterator        
 
     @staticmethod
     def _random_uuid():
@@ -229,17 +238,15 @@ class Seq2SeqIter(DataIter):
             with open(Seq2SeqIter._normalize_path(path, uuid), 'wb') as f:
                 np.savez_compressed(f, src=src, targ=targ, label=label)
 
-    def _deserialize_np_arrays(mappings, path):
-        data = []
-        for entry in mappings:
-            with open(normalize_path(path, entry)) as f:
+    def _deserialize_np_arrays(self, directory):
+        self.bucketed_data = []
+        for entry in tqdm(self.mappings, desc='Deserializing NumPy arrays'):
+            with open(Seq2SeqIter._normalize_path(directory, entry)) as f:
                 npz_file = np.load(f)
                 src = npz_file['src']
                 targ = npz_file['targ']
                 label = npz_file['label']
-            data.append((src, targ, label))
-        return data
- 
+            self.bucketed_data.append((src, targ, label))
 
     # iterate over data
     def next(self):
@@ -418,7 +425,16 @@ if __name__ == '__main__':
 
     train_iter.reset()   
 
-    train_iter.save('iterator.pkl')
+    train_iter.save('train_iterator.pkl')
+
+    valid_iter = Seq2SeqIter(dataset.src_valid_sent, dataset.targ_valid_sent, dataset.src_vocab, dataset.inv_src_vocab,
+                     dataset.targ_vocab, dataset.inv_targ_vocab, layout='TN', batch_size=32, buckets=all_pairs)
+
+    valid_iter.bucketize()
+
+    valid_iter.reset()   
+
+    valid_iter.save('valid_iterator.pkl')
 
 #    bucketed_data = train_iter.bucketed_data
 #    mappings = serialize_list_tup_np_arr(bucketed_data)

@@ -143,32 +143,32 @@ def get_data2(layout):
 #		src_train_sent=src_train_sent, src_valid_sent=src_valid_sent, src_vocab=src_vocab, inv_src_vocab=inv_src_vocab,
 #		targ_train_sent=targ_train_sent, targ_valid_sent=targ_valid_sent, targ_vocab=targ_vocab, inv_targ_vocab=inv_targ_vocab)
 
-    start = time()
+#    start = time()
 
-    dataset = get_s2s_data(
-        src_train_path='./data/europarl-v7.es-en.en_train_small',
-        src_valid_path='./data/europarl-v7.es-en.en_valid_small', # valid_small',
-        targ_train_path='./data/europarl-v7.es-en.es_train_small',
-        targ_valid_path='./data/europarl-v7.es-en.es_valid_small' # valid_small'
-    )
+#    dataset = get_s2s_data(
+#        src_train_path='./data/europarl-v7.es-en.en_train_small',
+#        src_valid_path='./data/europarl-v7.es-en.en_valid_small', # valid_small',
+#        targ_train_path='./data/europarl-v7.es-en.es_train_small',
+#        targ_valid_path='./data/europarl-v7.es-en.es_valid_small' # valid_small'
+#    )
     
-    duration = time() - start
+#    duration = time() - start
 
-    print("Parsing text took %.2f seconds" % duration)
+#    print("Parsing text took %.2f seconds" % duration)
 
-    with open('dataset.pkl', 'wb') as f:
-        pickle.dump(dataset, f, 2)
+#    with open('dataset.pkl', 'wb') as f:
+#        pickle.dump(dataset, f, 2)
  
-    del dataset
+#    del dataset
 
-    start = time()
+#    start = time()
 
-    with open('dataset.pkl', 'rb') as f:
-        dataset = pickle.load(f)
+#    with open('dataset.pkl', 'rb') as f:
+#        dataset = pickle.load(f)
  
-    duration = time() - start
+#    duration = time() - start
  
-    print("Deserializing preprocessed dataset took %.2f seconds" % duration)
+#    print("Deserializing preprocessed dataset took %.2f seconds" % duration)
 
 #    train_src_sent = train_dataset.src_sent
 #    train_targ_sent = train_dataset.targ_sent
@@ -180,38 +180,46 @@ def get_data2(layout):
 
    
 
-    min_len = 5 #min(min(sent_len(train_src_sent)), min(sent_len(train_targ_sent)))
+#    min_len = 5 #min(min(sent_len(train_src_sent)), min(sent_len(train_targ_sent)))
 
-    max_len = 65
-    increment = 5
+#    max_len = 65
+#    increment = 5
 
-    all_pairs = [(i, j) for i in xrange(
-            min_len,max_len+increment,increment
-        ) for j in xrange(
-            min_len,max_len+increment,increment
-        )]
+#    all_pairs = [(i, j) for i in xrange(
+#            min_len,max_len+increment,increment
+#        ) for j in xrange(
+#            min_len,max_len+increment,increment
+#        )]
 
     start = time()
 
-    train_iter = Seq2SeqIter(dataset.src_train_sent, dataset.targ_train_sent, dataset.src_vocab, dataset.inv_src_vocab, 
-                     dataset.targ_vocab, dataset.inv_targ_vocab, layout=layout, batch_size=args.batch_size, buckets=all_pairs)
+    train_iter = Seq2SeqIter.load('train_iterator.pkl')
 
-    bucketed_data = train_iter.bucketed_data
-    del train_iter.bucketed_data
-    with open('train_iter.pkl', 'wb') as f:
-        pickle.dump(train_iter, f, 2)
-    del train_iter
-
-    with open('train_iter.pkl', 'rb') as f:
-        train_iter = pickle.load(f)
- 
-    train_iter.bucketed_data = bucketed_data
-  
-    valid_iter = Seq2SeqIter(dataset.src_valid_sent, dataset.targ_valid_sent, dataset.src_vocab, dataset.inv_src_vocab, 
-                     dataset.targ_vocab, dataset.inv_targ_vocab, layout=layout, batch_size=args.batch_size, buckets=all_pairs)
+    valid_iter = Seq2SeqIter.load('valid_iterator.pkl')
 
     duration = time() - start
-    print("Generating iterators took %.2f seconds" % duration)
+
+    print("\nDeserializing training and validation iterators took %.2f seconds\n" % duration)
+
+ #   train_iter = Seq2SeqIter(dataset.src_train_sent, dataset.targ_train_sent, dataset.src_vocab, dataset.inv_src_vocab, 
+ #                    dataset.targ_vocab, dataset.inv_targ_vocab, layout=layout, batch_size=args.batch_size, buckets=all_pairs)
+
+#    bucketed_data = train_iter.bucketed_data
+#    del train_iter.bucketed_data
+#    with open('train_iter.pkl', 'wb') as f:
+#        pickle.dump(train_iter, f, 2)
+#    del train_iter
+
+#    with open('train_iter.pkl', 'rb') as f:
+#        train_iter = pickle.load(f)
+ 
+#    train_iter.bucketed_data = bucketed_data
+  
+#    valid_iter = Seq2SeqIter(dataset.src_valid_sent, dataset.targ_valid_sent, dataset.src_vocab, dataset.inv_src_vocab, 
+#                     dataset.targ_vocab, dataset.inv_targ_vocab, layout=layout, batch_size=args.batch_size, buckets=all_pairs)
+
+#    duration = time() - start
+#    print("Generating iterators took %.2f seconds" % duration)
 
 #    with open('train_iter.pkl', 'r') as f:
 #        train_iter = pickle.load(f)
@@ -219,8 +227,8 @@ def get_data2(layout):
 #    with open('valid_iter.pkl', 'r') as f:
 #        valid_iter = pickle.load(f)
 
-    train_iter.reset()
-    valid_iter.reset()
+    # train_iter.reset()
+    # valid_iter.reset()
     
     print("\nSize of src vocab: %d" % len(train_iter.src_vocab))
     print("Size of targ vocab: %d\n" % len(train_iter.targ_vocab))
