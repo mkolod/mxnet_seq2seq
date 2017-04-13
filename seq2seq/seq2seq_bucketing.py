@@ -157,7 +157,7 @@ def get_data2(layout):
     print("Parsing text took %.2f seconds" % duration)
 
     with open('dataset.pkl', 'wb') as f:
-        pickle.dump(dataset, f)
+        pickle.dump(dataset, f, 2)
  
     del dataset
 
