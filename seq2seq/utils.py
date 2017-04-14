@@ -47,7 +47,7 @@ def word_count(lines, data_name=''):
 def merge_counts(dict1, dict2):
     return { k: dict1.get(k, 0) + dict2.get(k, 0) for k in tqdm(set(dict1) | set(dict2), desc='merge word counts') }
 
-def top_words_train_valid(train_fname, valid_fname, top_k=1000, unk_key=0, reserved_tokens=['<UNK>', '<PAD>', '<EOS>', '<GO>']):
+def top_words_train_valid(train_fname, valid_fname, top_k=50000, unk_key=0, reserved_tokens=['<UNK>', '<PAD>', '<EOS>', '<GO>']):
 
     counts = word_count(preprocess_lines(train_fname), data_name='train')
 #    valid_counts = word_count(preprocess_lines(valid_fname), data_name='valid')
