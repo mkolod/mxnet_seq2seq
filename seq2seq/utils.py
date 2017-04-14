@@ -72,7 +72,7 @@ def tokenize_text(path, vocab):
     lines = preprocess_lines(path)
     print("Encoding sentences")
     sentences = encode_sentences(lines, vocab)
-    return sentences, vocab
+    return sentences
 
 def array_to_text(array, inv_vocab):
     sent = []
@@ -87,17 +87,17 @@ def get_s2s_data(src_train_path, src_valid_path, targ_train_path, targ_valid_pat
         src_dict, inv_src_dict = top_words_train_valid(src_train_path, src_valid_path)
        
         print("Tokenizing src_train_path") 
-	src_train_sent, _ = tokenize_text(src_train_path, vocab=src_dict)
+	src_train_sent = tokenize_text(src_train_path, vocab=src_dict)
         print("Tokenizing targ_train_path")
-        src_valid_sent, _ = tokenize_text(src_valid_path, vocab=src_dict)
+        src_valid_sent = tokenize_text(src_valid_path, vocab=src_dict)
 
         print("Creating joint target dictionary")
         targ_dict, inv_targ_dict = top_words_train_valid(targ_train_path, targ_valid_path)
 
         print("Tokenizing targ_train_path")
-	targ_train_sent, _ = tokenize_text(targ_train_path, vocab=targ_dict)
+	targ_train_sent = tokenize_text(targ_train_path, vocab=targ_dict)
         print("Tokenizing targ_valid_path")
-        targ_valid_sent, _ = tokenize_text(targ_valid_path, vocab=targ_dict)
+        targ_valid_sent = tokenize_text(targ_valid_path, vocab=targ_dict)
 
         print("\nEncoded examples:\n")
         for i in range(5):

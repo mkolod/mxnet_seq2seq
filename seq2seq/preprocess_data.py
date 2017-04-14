@@ -28,14 +28,19 @@ if __name__ == '__main__':
     start = time()
 
     dataset = get_s2s_data(
-        src_train_path= './data/europarl-v7.es-en.en_train_small',  # './data/wmt15-de-en/src_train', # './data/europarl-v7.es-en.en_train_small',
-        src_valid_path= './data/europarl-v7.es-en.en_valid_small',  # './data/wmt15-de-en/src_valid', # valid_small',
-        targ_train_path= './data/europarl-v7.es-en.es_train_small',  # 'data/wmt15-de-en/targ_train',
-        targ_valid_path='./data/europarl-v7.es-en.en_valid_small' # 'data/wmt15-de-en/targ_valid' # valid_small'
+        src_train_path= './data/wmt15-de-en/',  # './data/europarl-v7.es-en.en_train_small',
+        src_valid_path= './data/wmt15-de-en/', # './data/europarl-v7.es-en.en_valid_small',
+        targ_train_path= './data/wmt15-de-en/',  # './data/europarl-v7.es-en.es_train_small',
+        targ_valid_path= './data/wmt15-de-en/'  #'./data/europarl-v7.es-en.en_valid_small'
     )
    
     preproc_duration = time() - start
     print("\nPreprocessing data took %.4f seconds\n" % preproc_duration)
+
+    print("src dictionary size: %d" % len(dataset.src_vocab))
+    print("targ dictionary size: %d" % len(dataset.targ_vocab))
+    print("inv src dictionary size: %d" % len(dataset.inv_src_vocab))
+    print("inv targ dictionary size: %d" % len(dataset.inv_targ_vocab))
 
     min_len = 5
 
