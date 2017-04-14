@@ -21,6 +21,15 @@ Dataset = namedtuple(
 def invert_dict(d):
     return {v: k for k, v in d.iteritems()}
 
+def encode_sentences(sentences, vocab):
+    res = []
+    for sent in sentences:
+        coded = []
+        for word in sent:
+            coded.append(vocab[word])
+        res.append(coded)
+    return res 
+
 def preprocess_lines(fname):
     print("Reading file: %s" % fname)
     lines = unidecode(open(fname).read().decode('utf-8')).split('\n')
@@ -40,37 +49,23 @@ def merge_counts(dict1, dict2):
 
 def top_words_train_valid(train_fname, valid_fname, top_k=50000, reserved_tokens=['<UNK>', '<PAD>', '<EOS>', '<GO>']):
 
-    train_counts = word_count(preprocess_lines(train_fname), data_name='train')
-    valid_counts = word_count(preprocess_lines(valid_fname), data_name='valid')
-    counts   = merge_counts(train_counts, valid_counts)
-
-    del train_counts
-    del valid_counts
+    counts = word_count(preprocess_lines(train_fname), data_name='train')
+#    valid_counts = word_count(preprocess_lines(valid_fname), data_name='valid')
+#    counts   = merge_counts(train_counts, valid_counts)
 
     print("Choosing top n words for the dictionary.")
     sorted_x = sorted(counts.items(), key=operator.itemgetter(1), reverse=True)
-    sorted_x = map(lambda x: x[0], sorted_x) # sorted_x[:top_k])
+    sorted_x = map(lambda x: x[0], sorted_x[:top_k]) # sorted_x
     start_idx = len(reserved_tokens)
     sorted_x = zip(sorted_x, range(start_idx, len(sorted_x) + start_idx))
     # value 0 is reserved for <UNK> or its semantic equivalent
     tops = defaultdict(lambda: 0, sorted_x)
     return tops
 
-
-# Decode text as UTF-8
-# Remove diacritical signs and convert to Latin alphabet
-# Separate punctuation as separate "words"
-#def tokenize_text(fname, vocab=None, invalid_label=0, start_label=1):
-#    lines = unidecode(open(fname).read().decode('utf-8')).split('\n')
-#    lines = map(lambda x: re.sub('[^A-Za-z0-9\s]', '', x).split(' '), lines)
-#    
-#    sentences, vocab = mx.rnn.encode_sentences(lines, vocab=vocab, invalid_label=invalid_label, start_label=start_label)
-#    return sentences, vocab
-
-def tokenize_text(path, vocab, invalid_label=0, start_label=4):
+def tokenize_text(path, vocab, invalid_label=-1, start_label=4):
     lines = preprocess_lines(path)
     print("Encoding sentences")
-    sentences, vocab = mx.rnn.encode_sentences(lines, vocab=vocab, invalid_label=invalid_label, start_label=start_label)
+    sentences = encode_sentences(lines, vocab)
     return sentences, vocab
 
 def get_s2s_data(src_train_path, src_valid_path, targ_train_path, targ_valid_path,
