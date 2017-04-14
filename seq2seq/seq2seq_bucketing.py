@@ -263,7 +263,6 @@ def train(args):
 
         # This should be based on EOS or max seq len for inference, but here we unroll to the target length
         # TODO: fix <GO> symbol
-        print("dec_seq_len: %d" % dec_seq_len)
 #        outputs, _ = decoder_unroll(decoder, targ_embed, targ_vocab, dec_seq_len, 0, begin_state=states, layout='TNC', merge_outputs=True)
 
         pred = mx.sym.Reshape(outputs,
