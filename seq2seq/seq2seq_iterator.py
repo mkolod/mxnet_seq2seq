@@ -111,7 +111,10 @@ class Seq2SeqIter(DataIter):
         self.sorted_keys = map(lambda x: x[2], sorted_keys)
         self.bucketed_data = [] 
         self.bucket_idx_to_key = []
-        
+
+        global_count = 0L
+        error_count  = 0L        
+
         for group in grouped:
             
             # get src and targ sentences, ignore the last elem of the tuple 
@@ -126,15 +129,22 @@ class Seq2SeqIter(DataIter):
             new_label = np.full((len(value), key[1] + 1), self.pad_id, dtype=self.dtype)
             
             for idx, example in enumerate(value):
-                curr_src, curr_targ = example
-                rev_src = curr_src[::-1]
-                new_src[idx, -len(curr_src):] = rev_src
+                try:
+                    global_count += 1
+                    curr_src, curr_targ = example
+                    rev_src = curr_src[::-1]
+                    new_src[idx, -len(curr_src):] = rev_src
 
-                new_targ[idx, 0] = self.go_id
-                new_targ[idx, 1:(len(curr_targ)+1)] = curr_targ
+                    new_targ[idx, 0] = self.go_id
+                    new_targ[idx, 1:(len(curr_targ)+1)] = curr_targ
 
-                new_label[idx, 0:len(curr_targ)] = curr_targ
-                new_label[idx, len(curr_targ)] = self.eos_id
+                    new_label[idx, 0:len(curr_targ)] = curr_targ
+                    new_label[idx, len(curr_targ)] = self.eos_id
+                except ValueError as ve:
+                    error_count += 1
+                    print(ve.message)
+                    print("global count: %d, error count: %d" % (global_count, error_count))
+                    continue
                             
             self.bucketed_data.append((new_src, new_targ, new_label))
 
