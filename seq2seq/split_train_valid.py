@@ -1,16 +1,36 @@
 from os import linesep
 import random
 from tqdm import tqdm
+import argparse
 
 if __name__ == '__main__':
 
-    random.seed(42)
-    train_split = 0.8
-    valid_split = 1.0 - train_split
 
-    directory = './data/wmt15-de-en/'
-    src_file = directory + 'all.en'
-    targ_file = directory + 'all.de'
+    parser = argparse.ArgumentParser(description="Split training and validation data",
+             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+    parser.add_argument('--in-src-data-path', type=str, help='path to concatenated source corpus', required=True)
+    parser.add_argument('--in-targ-data-path', type=str, help='path to concatenated target corpus', required=True)
+    parser.add_argument('--out-src-train-path', type=str, help='path to source training corpus (to be created)', required=True)
+    parser.add_argument('--out-targ-train-path', type=str, help='path to target training corpus (to be created)', required=True)
+    parser.add_argument('--out-src-valid-path', type=str, help='path to source validation corpus (to be created)', required=True)
+    parser.add_argument('--out-targ-valid-path', type=str, help='path to target validation corpus (to be created)', required=True)
+    parser.add_argument('--validation-fraction', type=float, help='fraction of data to reserve for validation, > 0.0 and < 1.0', default=0.2)
+    parser.add_argument('--shuffle-seed', type=int, help='random number generator seed for shuffling corpora before train/valid split (int)', default=42)
+ 
+    args = parser.parse_args()
+
+
+    valid_split = args.validation_fraction
+    train_split = 1.0 - valid_split
+
+    src_file = args.in_src_data_path
+    targ_file = args.in_targ_data_path
+
+    src_train = args.out_src_train_path
+    src_valid = args.out_src_valid_path
+    targ_train = args.out_targ_train_path
+    targ_valid = args.out_targ_valid_path
 
     def num_lines(fname):
         with open(fname) as f:
@@ -36,8 +56,8 @@ if __name__ == '__main__':
     valid_indices = set(indices[num_train:])
  
     with open(src_file, 'r') as src_file, open(targ_file, 'r') as targ_file,        \
-        open(directory + 'src_train', 'w') as src_train, open(directory + 'targ_train', 'w') as targ_train, \
-        open(directory + 'src_valid', 'w') as src_valid, open(directory + 'targ_valid', 'w') as targ_valid:
+        open(src_train, 'w') as src_train, open(targ_train, 'w') as targ_train, \
+        open(src_valid, 'w') as src_valid, open(targ_valid, 'w') as targ_valid:
 
         for idx in tqdm(range(num_lines_src), desc='Line of source/target data'):
             src_line = src_file.readline()
@@ -48,6 +68,6 @@ if __name__ == '__main__':
                 targ_train.write(targ_line + linesep)
             else:
                 src_valid.write(src_line + linesep)
-                targ_valid.write(targ_line +linesep)
+                targ_valid.write(targ_line + linesep)
 
-print("\nDone\n")
+    print("\n")
