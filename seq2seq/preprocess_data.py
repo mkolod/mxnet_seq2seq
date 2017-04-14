@@ -28,10 +28,10 @@ if __name__ == '__main__':
     start = time()
 
     dataset = get_s2s_data(
-        src_train_path='./data/wmt15-de-en/src_train', # './data/europarl-v7.es-en.en_train_small',
-        src_valid_path='./data/wmt15-de-en/src_valid', # valid_small',
-        targ_train_path='data/wmt15-de-en/targ_train',
-        targ_valid_path='data/wmt15-de-en/targ_valid' # valid_small'
+        src_train_path= './data/europarl-v7.es-en.en_train_small',  # './data/wmt15-de-en/src_train', # './data/europarl-v7.es-en.en_train_small',
+        src_valid_path= './data/europarl-v7.es-en.en_valid_small',  # './data/wmt15-de-en/src_valid', # valid_small',
+        targ_train_path= './data/europarl-v7.es-en.es_train_small',  # 'data/wmt15-de-en/targ_train',
+        targ_valid_path='./data/europarl-v7.es-en.en_valid_small' # 'data/wmt15-de-en/targ_valid' # valid_small'
     )
    
     preproc_duration = time() - start
