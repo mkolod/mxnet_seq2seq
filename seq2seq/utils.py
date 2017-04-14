@@ -1,4 +1,5 @@
 import mxnet as mx
+import os
 import re
 import operator
 import string
@@ -30,12 +31,28 @@ def encode_sentences(sentences, vocab):
         res.append(coded)
     return res 
 
+def linecount_wc(path):
+    return int(os.popen('wc -l %s' % path).read().split()[0])
+
 def preprocess_lines(fname):
-    print("Reading file: %s" % fname)
-    lines = unidecode(open(fname).read().decode('utf-8')).split('\n')
-    lines = map(lambda x: filter(lambda y: y != '', re.sub('\s+', ' ', re.sub('([' + string.punctuation + '])', r' \1 ', x) ).split(' ')), lines)
-    lines = filter(lambda x: x != [], lines)
+    # I could read the file all at once, but then I couldn't
+    # report progress for big files via tqdm to give an ETA
+    fast_line_count = linecount_wc(fname)
+    print("\nReading file: %s" % fname)
+    with open(fname, 'r') as f:
+        lines = []
+        for line in tqdm(f, desc='Reading progress', total=fast_line_count):
+            line = unidecode(line.decode('utf-8'))
+            line = filter(lambda y: y != '', re.sub('\s+', ' ', re.sub('([' + string.punctuation + '])', r' \1 ', line) ).split(' '))
+            lines.append(line)
     return lines
+
+# def preprocess_lines(fname):
+#    print("Reading file: %s" % fname)
+#    lines = unidecode(open(fname).read().decode('utf-8')).split('\n')
+#    lines = map(lambda x: filter(lambda y: y != '', re.sub('\s+', ' ', re.sub('([' + string.punctuation + '])', r' \1 ', x) ).split(' ')), lines)
+#    lines = filter(lambda x: x != [], lines)
+#    return lines
 
 def word_count(lines, data_name=''):
     counts = defaultdict(long)
