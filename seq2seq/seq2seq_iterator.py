@@ -267,6 +267,15 @@ class Seq2SeqIter(DataIter):
         except StopIteration:
             return False, iter
 
+#has_el, iter = has_elements(iter)
+#if has_el:
+  # not empty
+#This isn't really pythonic, and for particular cases, there are probably better (but less general) solutions, like the next default.
+
+#first = next(iter, None)
+#if first:
+  # Do something
+
     # iterate over data
     def next(self):
 
