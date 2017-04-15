@@ -82,9 +82,9 @@ class Seq2SeqIter(DataIter):
         self.switch_bucket = True
         self.num_buckets = -1
         self.bucket_iterator_indices = []
-        self.default_bucket_key = -1
+        self.default_bucket_key = -1 
         self.mappings = None
-#
+
 #        if self.layout == 'TN':
 #            self.provide_data = [
 #                mx.io.DataDesc(self.src_data_name, (self.default_bucket_key[0], self.batch_size), layout='TN'),
@@ -258,60 +258,82 @@ class Seq2SeqIter(DataIter):
                 label = npz_file['label']
             self.bucketed_data.append((src, targ, label))
 
+    def has_elements(iter):
+        from itertools import tee
+        iter, any_check = tee(iter)
+        try:
+            any_check.next()
+            return True, iter
+        except StopIteration:
+            return False, iter
+
     # iterate over data
     def next(self):
-        try:
-            if self.switch_bucket:
-                self.interbucket_idx += 1
-                self.curr_bucket_id = self.bucket_iterator_indices[self.interbucket_idx]
-                self.curr_buck = self.bucketed_data[self.curr_bucket_id]
-                src_buck_len, src_buck_wid = self.curr_buck[0].shape
-                targ_buck_len, targ_buck_wid = self.curr_buck[1].shape                 
-                if src_buck_len == 0 or src_buck_wid == 0:
-                    raise StopIteration
-                if targ_buck_len == 0 or targ_buck_wid == 0:
-                    raise StopIteration
-                self.curr_chunks = self.chunks(range(src_buck_len), self.batch_size)
-                self.switch_bucket = False
-            current = self.curr_chunks.next()
-            src_ex = ndarray.array(self.curr_buck[0][current])
-            targ_ex = ndarray.array(self.curr_buck[1][current])
-            label_ex = ndarray.array(self.curr_buck[2][current])
 
-            if self.layout == 'TN':
-                src_ex = src_ex.T
-                targ_ex = targ_ex.T
-                label_ex = label_ex.T
-
-            if self.layout == 'TN':
-                provide_data = [
-                    mx.io.DataDesc(self.src_data_name, (src_ex.shape[0], src_ex.shape[1]), layout='TN'),
-                    mx.io.DataDesc(self.targ_data_name, (targ_ex.shape[0], targ_ex.shape[1]), layout='TN')] # src_ex.shape[1] # self.batch_size
-                provide_label = [mx.io.DataDesc(self.label_name, (targ_ex.shape[0], self.batch_size), layout='TN')] # targ_ex.shape[1]
-
-            elif self.layout == 'NT':
-                provide_data = [
-                    (self.src_data_name, (self.batch_size, src_ex.shape[0])),
-                    (self.targ_data_name, (self.batch_size, targ_ex.shape[0]))]
-                provide_label = [(self.label_name, (self.batch_size, targ_ex.shape[0]))]
-            else:
-                raise Exception("Layout must be 'TN' or 'NT'") 
-
-
-            batch = DataBatch([src_ex, targ_ex], [label_ex], pad=0,
-                             bucket_key=self.bucket_idx_to_key[self.curr_bucket_id],
-                             provide_data=provide_data,
-                             provide_label=provide_label)
-            return batch
-                
-        except StopIteration as si:
-            if self.interbucket_idx == self.num_buckets - 1:
+        while self.switch_bucket:
+            self.interbucket_idx += 1
+            self.curr_bucket_id = self.bucket_iterator_indices[self.interbucket_idx]
+            self.curr_buck = self.bucketed_data[self.curr_bucket_id]
+            src_buck_len, src_buck_wid = self.curr_buck[0].shape
+            targ_buck_len, targ_buck_wid = self.curr_buck[1].shape                 
+            if self.interbucket_idx == len(self.bucket_iterator_indices):
+                self.switch_bucket = True
                 self.reset()
+                raise StopIteration
+            if src_buck_len == 0 or src_buck_wid == 0:
                 self.switch_bucket = True
-                raise si
-            else:
+                continue
+#                raise StopIteration
+            if targ_buck_len == 0 or targ_buck_wid == 0:
                 self.switch_bucket = True
-                return self.next()
+                continue
+#                raise StopIteration
+            self.curr_chunks = self.chunks(range(src_buck_len), self.batch_size)
+            has_
+            self.switch_bucket = False
+##            self.curr_chunks = self.chunks(range(src_buck_len), self.batch_size)
+#                self.switch_bucket = False
+ 
+        self.switch_bucket = False
+        current = self.curr_chunks.next()
+        src_ex = ndarray.array(self.curr_buck[0][current])
+        targ_ex = ndarray.array(self.curr_buck[1][current])
+        label_ex = ndarray.array(self.curr_buck[2][current])
+
+        if self.layout == 'TN':
+            src_ex = src_ex.T
+            targ_ex = targ_ex.T
+            label_ex = label_ex.T
+
+        if self.layout == 'TN':
+            provide_data = [
+                mx.io.DataDesc(self.src_data_name, (src_ex.shape[0], src_ex.shape[1]), layout='TN'),
+                mx.io.DataDesc(self.targ_data_name, (targ_ex.shape[0], targ_ex.shape[1]), layout='TN')] # src_ex.shape[1] # self.batch_size
+            provide_label = [mx.io.DataDesc(self.label_name, (targ_ex.shape[0], self.batch_size), layout='TN')] # targ_ex.shape[1]
+
+        elif self.layout == 'NT':
+            provide_data = [
+                (self.src_data_name, (self.batch_size, src_ex.shape[0])),
+                (self.targ_data_name, (self.batch_size, targ_ex.shape[0]))]
+            provide_label = [(self.label_name, (self.batch_size, targ_ex.shape[0]))]
+        else:
+            raise Exception("Layout must be 'TN' or 'NT'") 
+
+
+        batch = DataBatch([src_ex, targ_ex], [label_ex], pad=0,
+                         bucket_key=self.bucket_idx_to_key[self.curr_bucket_id],
+                         provide_data=provide_data,
+                         provide_label=provide_label)
+        return batch
+                
+#        except StopIteration as si:
+#            if self.interbucket_idx == self.num_buckets - 1:
+#                self.reset()
+#                self.switch_bucket = True
+#                raise si
+#            else:
+#                self.switch_bucket = True
+#                return self.next()
 
     @staticmethod
     def chunks(iterable, batch_size, trim_incomplete_batches=True):

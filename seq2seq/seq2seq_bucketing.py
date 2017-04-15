@@ -127,12 +127,12 @@ def get_data(layout):
 
     start = time()
 
-#    dataset = get_s2s_data(
-#        src_train_path='./data/europarl-v7.es-en.en_train_small',
-#        src_valid_path='./data/europarl-v7.es-en.en_valid_small', # valid_small',
-#        targ_train_path='./data/europarl-v7.es-en.es_train_small',
-#        targ_valid_path='./data/europarl-v7.es-en.es_valid_small' # valid_small'
-#    )
+    dataset = get_s2s_data(
+        src_train_path='./data/europarl-v7.es-en.en_train_small',
+        src_valid_path='./data/europarl-v7.es-en.en_valid_small', # valid_small',
+        targ_train_path='./data/europarl-v7.es-en.es_train_small',
+        targ_valid_path='./data/europarl-v7.es-en.es_valid_small' # valid_small'
+    )
 
     preproc_duration = time() - start
     print("\nPreprocessing data took %.4f seconds\n" % preproc_duration)
@@ -150,25 +150,25 @@ def get_data(layout):
 
 
     print("Constructing train iterator")
-#    train_iter = Seq2SeqIter(dataset.src_train_sent, dataset.targ_train_sent, dataset.src_vocab, dataset.inv_src_vocab,
-#                     dataset.targ_vocab, dataset.inv_targ_vocab, layout='TN', batch_size=32, buckets=all_pairs)
+    train_iter = Seq2SeqIter(dataset.src_train_sent, dataset.targ_train_sent, dataset.src_vocab, dataset.inv_src_vocab,
+                     dataset.targ_vocab, dataset.inv_targ_vocab, layout='TN', batch_size=32, buckets=all_pairs)
 
-#    train_iter.bucketize()
+    train_iter.bucketize()
 
-#    train_iter.reset()   
+    train_iter.reset()   
 
     print("Constructing valid iterator")
-#    valid_iter = Seq2SeqIter(dataset.src_valid_sent, dataset.targ_valid_sent, dataset.src_vocab, dataset.inv_src_vocab,
-#                     dataset.targ_vocab, dataset.inv_targ_vocab, layout='TN', batch_size=32, buckets=all_pairs)
+    valid_iter = Seq2SeqIter(dataset.src_valid_sent, dataset.targ_valid_sent, dataset.src_vocab, dataset.inv_src_vocab,
+                     dataset.targ_vocab, dataset.inv_targ_vocab, layout='TN', batch_size=32, buckets=all_pairs)
 
-#    valid_iter.bucketize()
+    valid_iter.bucketize()
 
-    train_iter = Seq2SeqIter.load('./data/train_iterator.pkl')
+#    train_iter = Seq2SeqIter.load('./data/train_iterator.pkl')
 
-    valid_iter = Seq2SeqIter.load('./data/valid_iterator.pkl')
+#    valid_iter = Seq2SeqIter.load('./data/valid_iterator.pkl')
 
-    print("source dict size: %d" % len(train_iter.src_dict))
-    print("targ dict size: %d" % len(train_iter.targ_dict))
+#    print("source dict size: %d" % len(train_iter.src_dict))
+#    print("targ dict size: %d" % len(train_iter.targ_dict))
 
 
 #    duration = time() - start
