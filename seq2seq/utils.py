@@ -18,16 +18,15 @@ Dataset = namedtuple(
     ['src_train_sent', 'src_valid_sent', 'src_vocab', 'inv_src_vocab', 
      'targ_train_sent', 'targ_valid_sent', 'targ_vocab', 'inv_targ_vocab'])
 
-
 def invert_dict(d):
     return {v: k for k, v in d.iteritems()}
 
-def encode_sentences(sentences, vocab):
+def encode_sentences(sentences, vocab, unk_id=1):
     res = []
     for sent in sentences:
         coded = []
         for word in sent:
-            coded.append(vocab[word])
+            coded.append(vocab[word]) if word in vocab else coded.append(unk_id)
         res.append(coded)
     return res 
 
@@ -43,16 +42,12 @@ def preprocess_lines(fname):
         lines = []
         for line in tqdm(f, desc='Reading progress', total=fast_line_count):
             line = unidecode(line.decode('utf-8'))
-            line = filter(lambda y: y != '', re.sub('\s+', ' ', re.sub('([' + string.punctuation + '])', r' \1 ', line) ).split(' '))
+            line = re.sub('\s+', ' ', re.sub('([' + string.punctuation + '])', r' \1 ', line)).split(' ')
+            if line == []:
+                continue
             lines.append(line)
     return lines
 
-# def preprocess_lines(fname):
-#    print("Reading file: %s" % fname)
-#    lines = unidecode(open(fname).read().decode('utf-8')).split('\n')
-#    lines = map(lambda x: filter(lambda y: y != '', re.sub('\s+', ' ', re.sub('([' + string.punctuation + '])', r' \1 ', x) ).split(' ')), lines)
-#    lines = filter(lambda x: x != [], lines)
-#    return lines
 
 def word_count(lines, data_name=''):
     counts = defaultdict(long)
@@ -64,11 +59,9 @@ def word_count(lines, data_name=''):
 def merge_counts(dict1, dict2):
     return { k: dict1.get(k, 0) + dict2.get(k, 0) for k in tqdm(set(dict1) | set(dict2), desc='merge word counts') }
 
-def top_words_train_valid(train_fname, valid_fname, top_k=50000, unk_key=0, reserved_tokens=['<UNK>', '<PAD>', '<EOS>', '<GO>']):
+def top_words_train_valid(train_fname, valid_fname, top_k=50000, unk_key=1, reserved_tokens=['<PAD>', '<UNK>', '<EOS>', '<GO>']):
 
     counts = word_count(preprocess_lines(train_fname), data_name='train')
-#    valid_counts = word_count(preprocess_lines(valid_fname), data_name='valid')
-#    counts   = merge_counts(train_counts, valid_counts)
 
     print("Choosing top n words for the dictionary.")
     sorted_x = sorted(counts.items(), key=operator.itemgetter(1), reverse=True)
@@ -76,7 +69,8 @@ def top_words_train_valid(train_fname, valid_fname, top_k=50000, unk_key=0, rese
     start_idx = len(reserved_tokens)
     sorted_x = zip(sorted_x, range(start_idx, len(sorted_x) + start_idx))
     # value 0 is reserved for <UNK> or its semantic equivalent
-    tops = defaultdict(lambda: 0, sorted_x)
+    # tops = defaultdict(lambda: 0, sorted_x)
+    tops = dict(sorted_x)
 
     for i in range(len(reserved_tokens)):
         tops[reserved_tokens[i]] = i

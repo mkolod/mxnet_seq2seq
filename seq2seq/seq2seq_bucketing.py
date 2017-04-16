@@ -163,6 +163,26 @@ def get_data(layout):
 
     valid_iter.bucketize()
 
+    train_iter.save('./data/train_iterator.pkl')
+    Seq2SeqIter.load('./data/train_iterator.pkl')
+    train_iter.init2()
+ 
+#    arrays = train_iter.bucketed_data
+
+#    with open('./data/train_iterator.pkl', 'wb') as f:
+#        pickle.dump(train_iter, f, 2)
+
+#    train_iter = None
+#    with open('./data/train_iterator.pkl', 'rb') as f:
+#        train_iter = pickle.load(f)
+ 
+#    train_iter.init2()
+
+
+
+
+#    train_iter.save('./data/train_iterator.pkl')
+
 #    train_iter = Seq2SeqIter.load('./data/train_iterator.pkl')
 
 #    valid_iter = Seq2SeqIter.load('./data/valid_iterator.pkl')

@@ -14,7 +14,8 @@ from tqdm import tqdm
 from utils import tokenize_text, invert_dict, get_s2s_data, Dataset
 
 import operator
-import dill as pickle
+import pickle
+#import dill as pickle
 import re
 import warnings
 
@@ -84,6 +85,8 @@ class Seq2SeqIter(DataIter):
         self.bucket_iterator_indices = []
         self.default_bucket_key = -1 
         self.mappings = None
+        self.provide_data = None
+        self.provide_label = None
 
 #        if self.layout == 'TN':
 #            self.provide_data = [
@@ -98,6 +101,22 @@ class Seq2SeqIter(DataIter):
 #            self.provide_label = [(self.label_name, (self.batch_size, self.default_bucket_key[1]))]
 #        else:
 #            raise ValueError("Invalid layout %s: Must by NT (batch major) or TN (time major)")
+
+    def init2(self):
+        if self.layout == 'TN':
+            self.provide_data = [
+                mx.io.DataDesc(self.src_data_name, (self.default_bucket_key[0], self.batch_size), layout='TN'),
+                mx.io.DataDesc(self.targ_data_name, (self.default_bucket_key[0], self.batch_size), layout='TN')
+            ]
+            self.provide_label = [mx.io.DataDesc(self.label_name, (self.default_bucket_key[1], self.batch_size), layout='TN')]
+        elif self.layout == 'NT':
+            self.provide_data = [
+                (self.src_data_name, (self.batch_size, self.default_bucket_key[0])),
+                (self.targ_data_name, (self.batch_size, self.default_bucket_key[0]))]
+            self.provide_label = [(self.label_name, (self.batch_size, self.default_bucket_key[1]))]
+        else:
+            raise ValueError("Invalid layout %s: Must by NT (batch major) or TN (time major)")
+
     
     def bucketize(self):
         tuples = []
@@ -161,19 +180,19 @@ class Seq2SeqIter(DataIter):
         self.bucket_iterator_indices = list(range(self.num_buckets))
         self.default_bucket_key = self.sorted_keys[-1]
 
-        if self.layout == 'TN':
-            self.provide_data = [
-                mx.io.DataDesc(self.src_data_name, (self.default_bucket_key[0], self.batch_size), layout='TN'),
-                mx.io.DataDesc(self.targ_data_name, (self.default_bucket_key[0], self.batch_size), layout='TN')
-            ]
-            self.provide_label = [mx.io.DataDesc(self.label_name, (self.default_bucket_key[1], self.batch_size), layout='TN')]
-        elif self.layout == 'NT':
-            self.provide_data = [
-                (self.src_data_name, (self.batch_size, self.default_bucket_key[0])),
-                (self.targ_data_name, (self.batch_size, self.default_bucket_key[0]))]
-            self.provide_label = [(self.label_name, (self.batch_size, self.default_bucket_key[1]))]
-        else:
-            raise ValueError("Invalid layout %s: Must by NT (batch major) or TN (time major)")
+#        if self.layout == 'TN':
+#            self.provide_data = [
+#                mx.io.DataDesc(self.src_data_name, (self.default_bucket_key[0], self.batch_size), layout='TN'),
+#                mx.io.DataDesc(self.targ_data_name, (self.default_bucket_key[0], self.batch_size), layout='TN')
+#            ]
+#            self.provide_label = [mx.io.DataDesc(self.label_name, (self.default_bucket_key[1], self.batch_size), layout='TN')]
+#        elif self.layout == 'NT':
+#            self.provide_data = [
+#                (self.src_data_name, (self.batch_size, self.default_bucket_key[0])),
+#                (self.targ_data_name, (self.batch_size, self.default_bucket_key[0]))]
+#            self.provide_label = [(self.label_name, (self.batch_size, self.default_bucket_key[1]))]
+#        else:
+#            raise ValueError("Invalid layout %s: Must by NT (batch major) or TN (time major)")
 
 #        return bucketed_data, bucket_idx_to_key
     
@@ -276,64 +295,63 @@ class Seq2SeqIter(DataIter):
 #if first:
   # Do something
 
+
     # iterate over data
     def next(self):
+        try:
+            if self.switch_bucket:
+                self.interbucket_idx += 1
+                self.curr_bucket_id = self.bucket_iterator_indices[self.interbucket_idx]
+                self.curr_buck = self.bucketed_data[self.curr_bucket_id]
+                src_buck_len, src_buck_wid = self.curr_buck[0].shape
+                targ_buck_len, targ_buck_wid = self.curr_buck[1].shape                 
+                if src_buck_len == 0 or src_buck_wid == 0:
+                    raise StopIteration
+                if targ_buck_len == 0 or targ_buck_wid == 0:
+                    raise StopIteration
+                self.curr_chunks = self.chunks(range(src_buck_len), self.batch_size)
+                self.switch_bucket = False
+            current = self.curr_chunks.next()
+            src_ex = ndarray.array(self.curr_buck[0][current])
+            targ_ex = ndarray.array(self.curr_buck[1][current])
+            label_ex = ndarray.array(self.curr_buck[2][current])
 
-        while self.switch_bucket:
-            self.interbucket_idx += 1
-            self.curr_bucket_id = self.bucket_iterator_indices[self.interbucket_idx]
-            self.curr_buck = self.bucketed_data[self.curr_bucket_id]
-            src_buck_len, src_buck_wid = self.curr_buck[0].shape
-            targ_buck_len, targ_buck_wid = self.curr_buck[1].shape                 
-            if self.interbucket_idx == len(self.bucket_iterator_indices):
-                self.switch_bucket = True
+            if self.layout == 'TN':
+                src_ex = src_ex.T
+                targ_ex = targ_ex.T
+                label_ex = label_ex.T
+
+            if self.layout == 'TN':
+                provide_data = [
+                    mx.io.DataDesc(self.src_data_name, (src_ex.shape[0], src_ex.shape[1]), layout='TN'),
+                    mx.io.DataDesc(self.targ_data_name, (targ_ex.shape[0], targ_ex.shape[1]), layout='TN')] # src_ex.shape[1] # self.batch_size
+                provide_label = [mx.io.DataDesc(self.label_name, (targ_ex.shape[0], self.batch_size), layout='TN')] # targ_ex.shape[1]
+
+            elif self.layout == 'NT':
+                provide_data = [
+                    (self.src_data_name, (self.batch_size, src_ex.shape[0])),
+                    (self.targ_data_name, (self.batch_size, targ_ex.shape[0]))]
+                provide_label = [(self.label_name, (self.batch_size, targ_ex.shape[0]))]
+            else:
+                raise Exception("Layout must be 'TN' or 'NT'") 
+
+
+            batch = DataBatch([src_ex, targ_ex], [label_ex], pad=0,
+                             bucket_key=self.bucket_idx_to_key[self.curr_bucket_id],
+                             provide_data=provide_data,
+                             provide_label=provide_label)
+            return batch
+                
+        except StopIteration as si:
+            if self.interbucket_idx == self.num_buckets - 1:
                 self.reset()
-                raise StopIteration
-            if src_buck_len == 0 or src_buck_wid == 0:
                 self.switch_bucket = True
-                continue
-#                raise StopIteration
-            if targ_buck_len == 0 or targ_buck_wid == 0:
+                raise si
+            else:
                 self.switch_bucket = True
-                continue
-#                raise StopIteration
-            self.curr_chunks = self.chunks(range(src_buck_len), self.batch_size)
-            has_
-            self.switch_bucket = False
-##            self.curr_chunks = self.chunks(range(src_buck_len), self.batch_size)
-#                self.switch_bucket = False
- 
-        self.switch_bucket = False
-        current = self.curr_chunks.next()
-        src_ex = ndarray.array(self.curr_buck[0][current])
-        targ_ex = ndarray.array(self.curr_buck[1][current])
-        label_ex = ndarray.array(self.curr_buck[2][current])
-
-        if self.layout == 'TN':
-            src_ex = src_ex.T
-            targ_ex = targ_ex.T
-            label_ex = label_ex.T
-
-        if self.layout == 'TN':
-            provide_data = [
-                mx.io.DataDesc(self.src_data_name, (src_ex.shape[0], src_ex.shape[1]), layout='TN'),
-                mx.io.DataDesc(self.targ_data_name, (targ_ex.shape[0], targ_ex.shape[1]), layout='TN')] # src_ex.shape[1] # self.batch_size
-            provide_label = [mx.io.DataDesc(self.label_name, (targ_ex.shape[0], self.batch_size), layout='TN')] # targ_ex.shape[1]
-
-        elif self.layout == 'NT':
-            provide_data = [
-                (self.src_data_name, (self.batch_size, src_ex.shape[0])),
-                (self.targ_data_name, (self.batch_size, targ_ex.shape[0]))]
-            provide_label = [(self.label_name, (self.batch_size, targ_ex.shape[0]))]
-        else:
-            raise Exception("Layout must be 'TN' or 'NT'") 
+                return self.next()
 
 
-        batch = DataBatch([src_ex, targ_ex], [label_ex], pad=0,
-                         bucket_key=self.bucket_idx_to_key[self.curr_bucket_id],
-                         provide_data=provide_data,
-                         provide_label=provide_label)
-        return batch
                 
 #        except StopIteration as si:
 #            if self.interbucket_idx == self.num_buckets - 1:
