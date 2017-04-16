@@ -1,7 +1,8 @@
 import numpy as np
 import mxnet as mx
 import argparse
-import dill as pickle
+import pickle
+#import dill as pickle
 
 from time import time
 import re
@@ -163,20 +164,16 @@ def get_data(layout):
 
     valid_iter.bucketize()
 
-    train_iter.save('./data/train_iterator.pkl')
-    Seq2SeqIter.load('./data/train_iterator.pkl')
-    train_iter.init2()
- 
 #    arrays = train_iter.bucketed_data
 
-#    with open('./data/train_iterator.pkl', 'wb') as f:
-#        pickle.dump(train_iter, f, 2)
+    with open('./data/train_iterator.pkl', 'wb') as f:
+        pickle.dump(train_iter, f, pickle.HIGHEST_PROTOCOL)
 
-#    train_iter = None
-#    with open('./data/train_iterator.pkl', 'rb') as f:
-#        train_iter = pickle.load(f)
+    train_iter = None
+    with open('./data/train_iterator.pkl', 'rb') as f:
+        train_iter = pickle.load(f)
  
-#    train_iter.init2()
+    train_iter.init2()
 
 
 
