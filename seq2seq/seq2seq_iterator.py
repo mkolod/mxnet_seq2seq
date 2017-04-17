@@ -283,6 +283,8 @@ class Seq2SeqIter(DataIter):
             try:
                 if self.switch_bucket:
                     self.interbucket_idx += 1
+                    if self.interbucket_idx >= self.num_buckets - 1:
+                        raise StopIteration
                     self.curr_bucket_id = self.bucket_iterator_indices[self.interbucket_idx]
                     self.curr_buck = self.bucketed_data[self.curr_bucket_id]
                     src_buck_len, src_buck_wid = self.curr_buck[0].shape
@@ -299,7 +301,7 @@ class Seq2SeqIter(DataIter):
                 try:
                     current = self.curr_chunks.next()
                 except StopIteration as si:
-                    print("end of bucket %s" % str(self.curr_buck))
+                    print("end of bucket %d of %d" % (self.interbucket_idx, len(self.bucket_iterator_indices)))
                     self.switch_bucket = True
                     continue
                 src_ex = ndarray.array(self.curr_buck[0][current])
@@ -331,7 +333,8 @@ class Seq2SeqIter(DataIter):
                                  provide_data=provide_data,
                                  provide_label=provide_label)
                 return batch
-                
+
+            # This is probably redundant                
             except StopIteration as si:
                 if self.interbucket_idx == self.num_buckets - 1:
                     self.reset()

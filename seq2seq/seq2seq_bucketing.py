@@ -8,7 +8,7 @@ from time import time
 import re
 from unidecode import unidecode
 
-from utils import tokenize_text, invert_dict, get_s2s_data, Dataset
+from utils import array_to_text, tokenize_text, invert_dict, get_s2s_data, Dataset
 
 from seq2seq_iterator import *
 
@@ -128,23 +128,32 @@ def get_data(layout):
 
     start = time()
 
-    print("Unpickling training iterator")
+    print("\nUnpickling training iterator")
 
     with open('./data/train_iterator.pkl', 'rb') as f:
         train_iter = pickle.load(f)
  
     train_iter.initialize()
 
-    print("Unpickling validation iterator")
+    print("\nUnpickling validation iterator")
 
     with open('./data/valid_iterator.pkl', 'rb') as f:
         valid_iter = pickle.load(f)
  
     valid_iter.initialize()
 
+    print("\nEncoded source language sentences:\n")
+    for i in range(5):
+        print(array_to_text(train_iter.src_sent[i], train_iter.inv_src_vocab))
+
+    print("\nEncoded target language sentences:\n")
+    for i in range(5):
+        print(array_to_text(valid_iter.targ_sent[i], train_iter.inv_targ_vocab))
+    
+
     duration = time() - start
 
-    print("Dataset deserialization time: %.2f seconds" % duration)
+    print("\nDataset deserialization time: %.2f seconds\n" % duration)
 
 
 
@@ -299,6 +308,8 @@ def train(args):
     if args.optimizer not in ['adadelta', 'adagrad', 'adam', 'rmsprop']:
         opt_params['momentum'] = args.mom
 
+    start = time()
+
     model.fit(
         train_data          = data_train,
         eval_data           = data_val,
@@ -314,6 +325,10 @@ def train(args):
         batch_end_callback  = mx.callback.Speedometer(args.batch_size, args.disp_batches),
         epoch_end_callback  = mx.rnn.do_rnn_checkpoint(decoder, args.model_prefix, 1)
                               if args.model_prefix else None)
+
+    train_duration = time() - start
+    time_per_epoch = train_duration / args.num_epochs
+    print("\n\nTime per epoch: %.2f seconds\n\n" % time_per_epoch)
 
 def test(args):
     assert args.model_prefix, "Must specifiy path to load from"
