@@ -1,7 +1,7 @@
 OpenNMT seq2seq model
 ==========================
 
-This project is an implementation of the [OpenNMT sequence-to-sequence model|http://opennmt.net/Models/] in MxNet. The OpenNMT model is based on:
+This project is an implementation of the [OpenNMT sequence-to-sequence model](http://opennmt.net/Models/) in MxNet. The OpenNMT model is based on:
 
 - a stacked LSTM encoder
 - a stacked LSTM decoder
@@ -22,7 +22,7 @@ The reference model is normally trained on the WMT15 English-German dataset, whi
 - Common Crawl
 - News Commentary v7
 
-For more details, see [here|http://opennmt.net/Models/].
+For more details, see [here](http://opennmt.net/Models/).
  
 ----------
 
