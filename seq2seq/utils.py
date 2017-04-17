@@ -92,34 +92,34 @@ def array_to_text(array, inv_vocab):
     return " ".join(sent)
 
 def get_s2s_data(src_train_path, src_valid_path, targ_train_path, targ_valid_path,
-         reserved_tokens=['<UNK>', '<PAD>', '<EOS>', '<GO>']):
+    reserved_tokens=['<UNK>', '<PAD>', '<EOS>', '<GO>']):
 
-        print("Creating joint source dictionary")
-        src_dict, inv_src_dict = top_words_train_valid(src_train_path, src_valid_path)
+    print("Creating joint source dictionary")
+    src_dict, inv_src_dict = top_words_train_valid(src_train_path, src_valid_path)
        
-        print("Tokenizing src_train_path") 
-	    src_train_sent = tokenize_text(src_train_path, vocab=src_dict)
-        print("Tokenizing targ_train_path")
-        src_valid_sent = tokenize_text(src_valid_path, vocab=src_dict)
+    print("Tokenizing src_train_path") 
+    src_train_sent = tokenize_text(src_train_path, vocab=src_dict)
+    print("Tokenizing targ_train_path")
+    src_valid_sent = tokenize_text(src_valid_path, vocab=src_dict)
 
-        print("Creating joint target dictionary")
-        targ_dict, inv_targ_dict = top_words_train_valid(targ_train_path, targ_valid_path)
+    print("Creating joint target dictionary")
+    targ_dict, inv_targ_dict = top_words_train_valid(targ_train_path, targ_valid_path)
 
-        print("Tokenizing targ_train_path")
-	    targ_train_sent = tokenize_text(targ_train_path, vocab=targ_dict)
-        print("Tokenizing targ_valid_path")
-        targ_valid_sent = tokenize_text(targ_valid_path, vocab=targ_dict)
+    print("Tokenizing targ_train_path")
+    targ_train_sent = tokenize_text(targ_train_path, vocab=targ_dict)
+    print("Tokenizing targ_valid_path")
+    targ_valid_sent = tokenize_text(targ_valid_path, vocab=targ_dict)
 
-        print("\nEncoded source language sentences:\n")
-        for i in range(5):
-            print(array_to_text(src_train_sent[i], inv_src_dict))            
+    print("\nEncoded source language sentences:\n")
+    for i in range(5):
+        print(array_to_text(src_train_sent[i], inv_src_dict))            
 
-        print("\nEncoded target language sentences:\n")
-        for i in range(5):
-            print(array_to_text(targ_train_sent[i], inv_targ_dict))            
+    print("\nEncoded target language sentences:\n")
+    for i in range(5):
+        print(array_to_text(targ_train_sent[i], inv_targ_dict))            
 
 
-	return Dataset(
-		src_train_sent=src_train_sent, src_valid_sent=src_valid_sent, src_vocab=src_dict, inv_src_vocab=inv_src_dict,
-		targ_train_sent=targ_train_sent, targ_valid_sent=targ_valid_sent, targ_vocab=targ_dict, inv_targ_vocab=inv_targ_dict)
+    return Dataset(
+        src_train_sent=src_train_sent, src_valid_sent=src_valid_sent, src_vocab=src_dict, inv_src_vocab=inv_src_dict,
+        targ_train_sent=targ_train_sent, targ_valid_sent=targ_valid_sent, targ_vocab=targ_dict, inv_targ_vocab=inv_targ_dict)
 
