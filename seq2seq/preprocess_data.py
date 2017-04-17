@@ -16,7 +16,7 @@ from utils import tokenize_text, invert_dict, get_s2s_data, Dataset
 from seq2seq_iterator import Seq2SeqIter
 
 import operator
-import dill as pickle
+import cPickle as pickle
 import re
 import warnings
 
