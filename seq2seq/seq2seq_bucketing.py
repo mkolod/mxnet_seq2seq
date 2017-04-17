@@ -128,53 +128,23 @@ def get_data(layout):
 
     start = time()
 
-    dataset = get_s2s_data(
-        src_train_path='./data/europarl-v7.es-en.en_train_small',
-        src_valid_path='./data/europarl-v7.es-en.en_valid_small', # valid_small',
-        targ_train_path='./data/europarl-v7.es-en.es_train_small',
-        targ_valid_path='./data/europarl-v7.es-en.es_valid_small' # valid_small'
-    )
+    print("Unpickling training iterator")
 
-    preproc_duration = time() - start
-    print("\nPreprocessing data took %.4f seconds\n" % preproc_duration)
-
-    min_len = 5
-
-    max_len = 65
-    increment = 5
-
-    all_pairs = [(i, j) for i in xrange(
-            min_len,max_len+increment,increment
-        ) for j in xrange(
-            min_len,max_len+increment,increment
-        )]
-
-
-    print("Constructing train iterator")
-    train_iter = Seq2SeqIter(dataset.src_train_sent, dataset.targ_train_sent, dataset.src_vocab, dataset.inv_src_vocab,
-                     dataset.targ_vocab, dataset.inv_targ_vocab, layout='TN', batch_size=32, buckets=all_pairs)
-
-    train_iter.bucketize()
-
-    train_iter.reset()   
-
-    print("Constructing valid iterator")
-    valid_iter = Seq2SeqIter(dataset.src_valid_sent, dataset.targ_valid_sent, dataset.src_vocab, dataset.inv_src_vocab,
-                     dataset.targ_vocab, dataset.inv_targ_vocab, layout='TN', batch_size=32, buckets=all_pairs)
-
-    valid_iter.bucketize()
-
-#    arrays = train_iter.bucketed_data
-
-    with open('./data/train_iterator.pkl', 'wb') as f:
-        pickle.dump(train_iter, f, pickle.HIGHEST_PROTOCOL)
-
-    train_iter = None
     with open('./data/train_iterator.pkl', 'rb') as f:
         train_iter = pickle.load(f)
  
-    train_iter.init2()
+    train_iter.initialize()
 
+    print("Unpickling validation iterator")
+
+    with open('./data/valid_iterator.pkl', 'rb') as f:
+        valid_iter = pickle.load(f)
+ 
+    valid_iter.initialize()
+
+    duration = time() - start
+
+    print("Dataset deserialization time: %.2f seconds" % duration)
 
 
 

@@ -37,15 +37,10 @@ if __name__ == '__main__':
     preproc_duration = time() - start
     print("\nPreprocessing data took %.4f seconds\n" % preproc_duration)
 
-    print("src dictionary size: %d" % len(dataset.src_vocab))
-    print("targ dictionary size: %d" % len(dataset.targ_vocab))
-    print("inv src dictionary size: %d" % len(dataset.inv_src_vocab))
-    print("inv targ dictionary size: %d" % len(dataset.inv_targ_vocab))
-
     min_len = 5
 
-    max_len = 55
-    increment = 10
+    max_len = 50
+    increment = 5
 
     all_pairs = [(i, j) for i in xrange(
             min_len,max_len+increment,increment
@@ -53,21 +48,24 @@ if __name__ == '__main__':
             min_len,max_len+increment,increment
         )]
 
+
+    print("Constructing train iterator")
     train_iter = Seq2SeqIter(dataset.src_train_sent, dataset.targ_train_sent, dataset.src_vocab, dataset.inv_src_vocab,
                      dataset.targ_vocab, dataset.inv_targ_vocab, layout='TN', batch_size=32, buckets=all_pairs)
 
     train_iter.bucketize()
 
-#    train_iter.reset()   
+    with open('./data/train_iterator.pkl', 'wb') as f:
+        pickle.dump(train_iter, f, pickle.HIGHEST_PROTOCOL)
 
-    train_iter.save('./data/train_iterator.pkl')
 
+    print("Constructing valid iterator")
     valid_iter = Seq2SeqIter(dataset.src_valid_sent, dataset.targ_valid_sent, dataset.src_vocab, dataset.inv_src_vocab,
                      dataset.targ_vocab, dataset.inv_targ_vocab, layout='TN', batch_size=32, buckets=all_pairs)
 
     valid_iter.bucketize()
 
-#    valid_iter.reset()   
+    with open('./data/valid_iterator.pkl', 'wb') as f:
+        pickle.dump(train_iter, f, pickle.HIGHEST_PROTOCOL)
 
-    valid_iter.save('./data/valid_iterator.pkl')
 

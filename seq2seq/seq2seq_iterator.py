@@ -102,7 +102,7 @@ class Seq2SeqIter(DataIter):
 #        else:
 #            raise ValueError("Invalid layout %s: Must by NT (batch major) or TN (time major)")
 
-    def init2(self):
+    def initialize(self):
         if self.layout == 'TN':
             self.provide_data = [
                 mx.io.DataDesc(self.src_data_name, (self.default_bucket_key[0], self.batch_size), layout='TN'),
