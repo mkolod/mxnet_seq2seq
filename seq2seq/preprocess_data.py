@@ -28,10 +28,10 @@ if __name__ == '__main__':
     start = time()
 
     dataset = get_s2s_data(
-        src_train_path= './data/europarl-v7.es-en.en_train_small',
-        src_valid_path= './data/europarl-v7.es-en.en_valid_small',
-        targ_train_path= './data/europarl-v7.es-en.es_train_small',
-        targ_valid_path= './data/europarl-v7.es-en.en_valid_small'
+        src_train_path= './data/wmt15-de-en/train.en',
+        src_valid_path= './data/wmt15-de-en/valid.en', # './data/europarl-v7.es-en.en_valid_small',
+        targ_train_path= './data/wmt15-de-en/train.de', # './data/europarl-v7.es-en.es_train_small',
+        targ_valid_path= './data/wmt15-de-en/valid.de' # './data/europarl-v7.es-en.en_valid_small'
     )
    
     preproc_duration = time() - start
@@ -39,8 +39,8 @@ if __name__ == '__main__':
 
     min_len = 5
 
-    max_len = 50
-    increment = 5
+    max_len = 55
+    increment = 10
 
     all_pairs = [(i, j) for i in xrange(
             min_len,max_len+increment,increment
@@ -51,7 +51,7 @@ if __name__ == '__main__':
 
     print("Constructing train iterator")
     train_iter = Seq2SeqIter(dataset.src_train_sent, dataset.targ_train_sent, dataset.src_vocab, dataset.inv_src_vocab,
-                     dataset.targ_vocab, dataset.inv_targ_vocab, layout='TN', batch_size=32, buckets=all_pairs)
+                     dataset.targ_vocab, dataset.inv_targ_vocab, layout='TN', batch_size=32, buckets=all_pairs, max_sent_len=50)
 
     train_iter.bucketize()
 
@@ -61,7 +61,7 @@ if __name__ == '__main__':
 
     print("Constructing valid iterator")
     valid_iter = Seq2SeqIter(dataset.src_valid_sent, dataset.targ_valid_sent, dataset.src_vocab, dataset.inv_src_vocab,
-                     dataset.targ_vocab, dataset.inv_targ_vocab, layout='TN', batch_size=32, buckets=all_pairs)
+                     dataset.targ_vocab, dataset.inv_targ_vocab, layout='TN', batch_size=32, buckets=all_pairs, max_sent_len=50)
 
     valid_iter.bucketize()
 

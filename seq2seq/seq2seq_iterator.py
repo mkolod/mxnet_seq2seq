@@ -299,7 +299,7 @@ class Seq2SeqIter(DataIter):
                 try:
                     current = self.curr_chunks.next()
                 except StopIteration as si:
-                    print("end of bucket %s" % str(self.curr_buck)
+                    print("end of bucket %s" % str(self.curr_buck))
                     self.switch_bucket = True
                     continue
                 src_ex = ndarray.array(self.curr_buck[0][current])
