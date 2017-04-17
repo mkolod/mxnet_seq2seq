@@ -98,7 +98,7 @@ def get_s2s_data(src_train_path, src_valid_path, targ_train_path, targ_valid_pat
         src_dict, inv_src_dict = top_words_train_valid(src_train_path, src_valid_path)
        
         print("Tokenizing src_train_path") 
-	src_train_sent = tokenize_text(src_train_path, vocab=src_dict)
+	    src_train_sent = tokenize_text(src_train_path, vocab=src_dict)
         print("Tokenizing targ_train_path")
         src_valid_sent = tokenize_text(src_valid_path, vocab=src_dict)
 
@@ -106,13 +106,18 @@ def get_s2s_data(src_train_path, src_valid_path, targ_train_path, targ_valid_pat
         targ_dict, inv_targ_dict = top_words_train_valid(targ_train_path, targ_valid_path)
 
         print("Tokenizing targ_train_path")
-	targ_train_sent = tokenize_text(targ_train_path, vocab=targ_dict)
+	    targ_train_sent = tokenize_text(targ_train_path, vocab=targ_dict)
         print("Tokenizing targ_valid_path")
         targ_valid_sent = tokenize_text(targ_valid_path, vocab=targ_dict)
 
-        print("\nEncoded examples:\n")
+        print("\nEncoded source language sentences:\n")
         for i in range(5):
             print(array_to_text(src_train_sent[i], inv_src_dict))            
+
+        print("\nEncoded target language sentences:\n")
+        for i in range(5):
+            print(array_to_text(targ_train_sent[i], inv_targ_dict))            
+
 
 	return Dataset(
 		src_train_sent=src_train_sent, src_valid_sent=src_valid_sent, src_vocab=src_dict, inv_src_vocab=inv_src_dict,
