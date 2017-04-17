@@ -134,6 +134,7 @@ def get_data(layout):
         train_iter = pickle.load(f)
  
     train_iter.initialize()
+    train_iter.batch_size = args.batch_size
 
     print("\nUnpickling validation iterator")
 
@@ -141,6 +142,7 @@ def get_data(layout):
         valid_iter = pickle.load(f)
  
     valid_iter.initialize()
+    valid_iter.batch_size = args.batch_size
 
     print("\nEncoded source language sentences:\n")
     for i in range(5):

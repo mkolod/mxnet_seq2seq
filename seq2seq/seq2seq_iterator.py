@@ -315,8 +315,8 @@ class Seq2SeqIter(DataIter):
 
                 if self.layout == 'TN':
                     provide_data = [
-                        mx.io.DataDesc(self.src_data_name, (src_ex.shape[0], src_ex.shape[1]), layout='TN'),
-                        mx.io.DataDesc(self.targ_data_name, (targ_ex.shape[0], targ_ex.shape[1]), layout='TN')] # src_ex.shape[1] # self.batch_size
+                        mx.io.DataDesc(self.src_data_name, (src_ex.shape[0], self.batch_size), layout='TN'),
+                        mx.io.DataDesc(self.targ_data_name, (targ_ex.shape[0], self.batch_size), layout='TN')] # src_ex.shape[1] # self.batch_size
                     provide_label = [mx.io.DataDesc(self.label_name, (targ_ex.shape[0], self.batch_size), layout='TN')] # targ_ex.shape[1]
  
                 elif self.layout == 'NT':
