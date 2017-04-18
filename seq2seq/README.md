@@ -35,6 +35,11 @@ How to run the scripts?
 
 ```python seq2seq_bucketing.py --num-layers 2 --num-embed 500 --num-hidden 500 --optimizer adam --disp-batches 1 --gpus 0,1 --num-epochs 1 --batch-size 256```
 
+Credits
+-------
+
+Thanks to Eric Xie (@piiswrong) for the attention cell implementation.
+
 
 > **Note:**
 
