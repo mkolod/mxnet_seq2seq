@@ -75,24 +75,27 @@ def print_inferred_shapes(node, arg_shapes, aux_shapes, out_shapes):
     print("\n============")
     print("args:")
     print("============")
-    if len(arg_shapes) == 0:
+    if len(args) == 0 or args[0] == "N/A":
         print("N/A")
-    for i in range(len(arg_shapes)):
-        print("%s: %s" % (args[i], arg_shapes[i]))
+    else:
+        for i in range(len(args)):
+            print("%s: %s" % (args[i], arg_shapes[i]))
     print("\n=============")
     print("aux_states:")
     print("=============")
-    if len(aux_shapes) == 0:
+    if len(aux_states) == 0 or aux_states[0] == "N/A":
         print("N/A")
-    for i in range(len(aux_states)):
-        print("%s: %s" % (aux_states[i], aux_shapes[i]))
+    else:
+        for i in range(min(len(aux_shapes), len(aux_states))):
+            print("%s: %s" % (aux_states[i], aux_shapes[i]))
     print("\n=============")
     print("outputs:")
     print("==============")
     if len(out_shapes) == 0:
         print("N/A")
-    for i in range(len(outputs)):
-        print("%s: %s" % (outputs[i], out_shapes[i]))
+    else:
+        for i in range(len(out_shapes)):
+            print("%s: %s" % (outputs[i], out_shapes[i]))
     print("\n================================================")
     print("\n")
 
@@ -144,6 +147,13 @@ def get_data(layout):
     valid_iter.initialize()
     valid_iter.batch_size = args.batch_size
 
+#    nextb = train_iter.next()
+#    print(type(nextb))
+#    print(dir(nextb))
+#    print(nextb.data)
+#    print(nextb.label)
+    
+
     print("\nEncoded source language sentences:\n")
     for i in range(5):
         print(array_to_text(train_iter.src_sent[i], train_iter.inv_src_vocab))
@@ -186,37 +196,69 @@ def decoder_unroll(decoder, target_embed, targ_vocab, unroll_length, go_symbol, 
         if begin_state is None:
             begin_state = decoder.begin_state()
 
-        print("first normalize sequence")
-        print("decoder_unroll: type(target_embed) = %s" % str(type(target_embed)))
         inputs, _ = _normalize_sequence(unroll_length, target_embed, layout, False)
 
         # Need to use hidden state from attention model, but <GO> as input
-        states = begin_state
         outputs = []
 
         # Replace this with a <GO> symbol
         feed = inputs[0]
-        output, states = decoder(feed, states)
 
-        pred = mx.sym.Reshape(output, shape=(-1, args.num_hidden), name='output_reshape') 
-        pred = mx.sym.FullyConnected(data=pred, num_hidden=len(targ_vocab), name='pred')
-        output = mx.sym.argmax(pred, name='argmax') 
+#         targ_embed = mx.sym.Embedding(data=targ_data, input_dim=len(targ_vocab),    # data=data
+#                                 output_dim=args.num_embed, name='targ_embed')       
+
+#        foo = feed.forward()
+#        print(foo)
+#        output, states = decoder(feed, begin_state)
+#        pred2 = mx.sym.Reshape(output, shape=(-1, args.num_hidden), name='output_reshape') 
+#        pred2 = mx.sym.FullyConnected(data=pred2, num_hidden=len(targ_vocab), name='pred2')
+#        pred2 = mx.sym.SoftmaxOutput(data=pred2, label=label, name='softmax')
+#        output2 = mx.sym.argmax(pred2, axis=0, keepdims=False, name='argmax')
+#        output2, _ = _normalize_sequence(1, output2, layout, merge_outputs)
+
+#        var = target_embed
+#        arg_shapes, out_shapes, aux_shapes = var.infer_shape_partial(targ_data=(55,1)) #src_data=(55,1), targ_data=(55,1))
+#        print_inferred_shapes(var, arg_shapes, out_shapes, aux_shapes)
+
+
+ #       output2, states = decoder(output2, states)
+  #      arg_shapes, out_shapes, aux_shapes = output2.infer_shape_partial(src_data=(55,1), targ_data=(55,1))
+   #     print_inferred_shapes(output2, arg_shapes, out_shapes, aux_shapes)
+#        output, states = decoder(output2, states)
+
 
 #        outputs, _ = _normalize_sequence(1, outputs, layout, merge_outputs)
 
-        pred_word_idx = mx.sym.Variable('pred_word_idx')
+#        pred_word_idx = mx.sym.Variable('pred_word_idx')
 
-        embed = mx.sym.Embedding(data=pred_word_idx, input_dim=len(targ_vocab),
-            output_dim=args.num_embed, name='src_embed') 
+#        embed = mx.sym.Embedding(data=pred_word_idx, input_dim=len(targ_vocab),
+#            output_dim=args.num_embed, name='src_embed') 
+ 
+        tokens = [1, 2, 3]
+        outputs2 = []
+        curr_token = mx.sym.Variable('curr_token')
+        infer_embed = mx.sym.Embedding(data = curr_token, input_dim=len(targ_vocab),
+                                     output_dim=args.num_embed, name='infer_embed')
+        output2, states2 = decoder(curr_token)
+        for i in range(len(tokens)):
+            infer_embed.bind(
+                
+        
 
         for i in range(0, unroll_length):
             # this works            
             output, states = decoder(inputs[i], states)
             outputs.append(output)
+#                print(target_embed.infer_shape_partial())
+#                src_data = mx.sym.Variable('src_data')
+#                targ_data = mx.sym.Variable('targ_data')
+#                label = mx.sym.Variable('softmax_label')
 
-        print("second normalize sequence")
-        print("len(outputs): %d" % len(outputs))
-        print("unroll_length: %d" % unroll_length)
+
+                 
+#          arg_shapes, out_shapes, aux_shapes = output.infer_shape(src_data=)
+#                print_inferred_shapes(output, arg_shapes, out_shapes, aux_shapes)
+
         outputs, _ = _normalize_sequence(unroll_length, outputs, layout, merge_outputs)
 
         return outputs, states
@@ -252,6 +294,11 @@ def train(args):
         targ_embed = mx.sym.Embedding(data=targ_data, input_dim=len(targ_vocab),    # data=data
                                  output_dim=args.num_embed, name='targ_embed')
 
+#        x = targ_embed.bind(mx.cpu(), {'targ_data': mx.nd.array([0, 1, 2]), 'targ_embed_weight': mx.nd.array(np.random.randn(50004, 500))})
+#        y = x.forward()
+#        z = y[0].asnumpy()
+#        print(np.shape(z))
+
         encoder.reset()
         decoder.reset()
 
@@ -261,22 +308,28 @@ def train(args):
         _, states = encoder.unroll(enc_seq_len, inputs=src_embed, layout=layout)
 
 
-        outputs, _ = decoder.unroll(dec_seq_len, inputs=targ_embed, begin_state=states, layout=layout, merge_outputs=True)
+        # decoder.unroll
+        #decoder_unroll(decoder, target_embed, targ_vocab, unroll_length, go_symbol, begin_state=None, layout='TNC', merge_outputs=None):
+        outputs, _ = decoder_unroll(decoder, targ_embed, targ_vocab, dec_seq_len, '<GO>', begin_state=states, layout=layout, merge_outputs=True)
+
+#        outputs, _ = decoder_unroll(dec_seq_len, inputs=targ_embed, begin_state=states, layout=layout, merge_outputs=True)
 
         # This should be based on EOS or max seq len for inference, but here we unroll to the target length
         # TODO: fix <GO> symbol
-#        outputs, _ = decoder_unroll(decoder, targ_embed, targ_vocab, dec_seq_len, 0, begin_state=states, layout='TNC', merge_outputs=True)
+#        outputs2, _ = decoder_unroll(decoder, targ_embed, targ_vocab, dec_seq_len, 0, begin_state=states, layout='TNC', merge_outputs=True)
+      
+
 
         pred = mx.sym.Reshape(outputs,
                 shape=(-1, args.num_hidden)) # -1
         pred = mx.sym.FullyConnected(data=pred, num_hidden=len(targ_vocab), name='pred')
 #        print(pred)
 #        print(dir(pred))
-#        print(pred.infer_shape_partial())
+#        partial = pred.infer_shape_partial()
+#        print(partial)
+#        print(dir(partial))
+#        print(type(partial))
 
-#        pred = mx.sym.Reshape(pred, shape=(enc_seq_len, 32, args.num_hidden))
- #       label = mx.sym.Reshape(label, shape=(enc_seq_len, 32))
-#        pred = mx.sym.Reshape(data=pred, shape=(-1,))
         label = mx.sym.Reshape(data=label, shape=(-1,))
 
         pred = mx.sym.SoftmaxOutput(data=pred, label=label, name='softmax')
