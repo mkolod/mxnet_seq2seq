@@ -4,6 +4,8 @@ import argparse
 import cPickle as pickle
 #import dill as pickle
 
+from rnn_cell import LSTMCell, SequentialRNNCell
+
 from time import time
 import re
 from unidecode import unidecode
@@ -227,17 +229,17 @@ def train(args):
 
     data_train, data_val, src_vocab, targ_vocab = get_data('TN')
 
-    encoder = mx.rnn.SequentialRNNCell()
+    encoder = SequentialRNNCell()
 
     for i in range(args.num_layers):
-        encoder.add(mx.rnn.LSTMCell(args.num_hidden, prefix='rnn_encoder%d_' % i))
+        encoder.add(LSTMCell(args.num_hidden, prefix='rnn_encoder%d_' % i))
         if i < args.num_layers - 1 and args.dropout > 0.0:
             encoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_encoder%d_' % i))
     encoder.add(AttentionEncoderCell())
 
     decoder = mx.rnn.SequentialRNNCell()
     for i in range(args.num_layers):
-        decoder.add(mx.rnn.LSTMCell(args.num_hidden, prefix=('rnn_decoder%d_' % i)))
+        decoder.add(LSTMCell(args.num_hidden, prefix=('rnn_decoder%d_' % i)))
         if i < args.num_layers - 1 and args.dropout > 0.0:
             decoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_decoder%d_' % i))
     decoder.add(DotAttentionCell())
