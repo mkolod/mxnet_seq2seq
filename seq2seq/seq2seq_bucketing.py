@@ -159,25 +159,6 @@ def get_data(layout):
 
     print("\nDataset deserialization time: %.2f seconds\n" % duration)
 
-
-
-#    train_iter.save('./data/train_iterator.pkl')
-
-#    train_iter = Seq2SeqIter.load('./data/train_iterator.pkl')
-
-#    valid_iter = Seq2SeqIter.load('./data/valid_iterator.pkl')
-
-#    print("source dict size: %d" % len(train_iter.src_dict))
-#    print("targ dict size: %d" % len(train_iter.targ_dict))
-
-
-#    duration = time() - start
-
-#    print("\nDeserializing training and validation iterators took %.2f seconds\n" % duration)
-
-#    print("\nSize of src vocab: %d" % len(train_iter.src_vocab))
-#    print("Size of targ vocab: %d\n" % len(train_iter.targ_vocab))
-
     return train_iter, valid_iter, train_iter.src_vocab, train_iter.targ_vocab
 
 # WORK IN PROGRESS !!!
@@ -188,8 +169,6 @@ def decoder_unroll(decoder, target_embed, targ_vocab, unroll_length, go_symbol, 
         if begin_state is None:
             begin_state = decoder.begin_state()
 
-        print("first normalize sequence")
-        print("decoder_unroll: type(target_embed) = %s" % str(type(target_embed)))
         inputs, _ = _normalize_sequence(unroll_length, target_embed, layout, False)
 
         # Need to use hidden state from attention model, but <GO> as input
@@ -204,8 +183,6 @@ def decoder_unroll(decoder, target_embed, targ_vocab, unroll_length, go_symbol, 
         pred = mx.sym.FullyConnected(data=pred, num_hidden=len(targ_vocab), name='pred')
         output = mx.sym.argmax(pred, name='argmax') 
 
-#        outputs, _ = _normalize_sequence(1, outputs, layout, merge_outputs)
-
         pred_word_idx = mx.sym.Variable('pred_word_idx')
 
         embed = mx.sym.Embedding(data=pred_word_idx, input_dim=len(targ_vocab),
@@ -216,9 +193,6 @@ def decoder_unroll(decoder, target_embed, targ_vocab, unroll_length, go_symbol, 
             output, states = decoder(inputs[i], states)
             outputs.append(output)
 
-        print("second normalize sequence")
-        print("len(outputs): %d" % len(outputs))
-        print("unroll_length: %d" % unroll_length)
         outputs, _ = _normalize_sequence(unroll_length, outputs, layout, merge_outputs)
 
         return outputs, states
@@ -262,23 +236,13 @@ def train(args):
         layout = 'TNC'
         _, states = encoder.unroll(enc_seq_len, inputs=src_embed, layout=layout)
 
-
-        outputs, _ = decoder.unroll(dec_seq_len, inputs=targ_embed, begin_state=states, layout=layout, merge_outputs=True)
-
         # This should be based on EOS or max seq len for inference, but here we unroll to the target length
         # TODO: fix <GO> symbol
-#        outputs, _ = decoder_unroll(decoder, targ_embed, targ_vocab, dec_seq_len, 0, begin_state=states, layout='TNC', merge_outputs=True)
+        outputs, _ = decoder_unroll(decoder, targ_embed, targ_vocab, dec_seq_len, 0, begin_state=states, layout='TNC', merge_outputs=True)
 
         pred = mx.sym.Reshape(outputs,
                 shape=(-1, args.num_hidden)) # -1
         pred = mx.sym.FullyConnected(data=pred, num_hidden=len(targ_vocab), name='pred')
-#        print(pred)
-#        print(dir(pred))
-#        print(pred.infer_shape_partial())
-
-#        pred = mx.sym.Reshape(pred, shape=(enc_seq_len, 32, args.num_hidden))
- #       label = mx.sym.Reshape(label, shape=(enc_seq_len, 32))
-#        pred = mx.sym.Reshape(data=pred, shape=(-1,))
         label = mx.sym.Reshape(data=label, shape=(-1,))
 
         pred = mx.sym.SoftmaxOutput(data=pred, label=label, name='softmax')
@@ -291,8 +255,7 @@ def train(args):
     else:
         contexts = mx.cpu(0)
 
-    # mx.mod.BucketingModule
-    model = mx.mod.BucketingModule(  # Seq2SeqBucketingModule(
+    model = mx.mod.BucketingModule( 
         sym_gen             = sym_gen,
         default_bucket_key  = data_train.default_bucket_key,
         context             = contexts)
@@ -346,12 +309,6 @@ def test(args):
     decoder.add(mx.rnn.LSTMCell(args.num_hidden, prefix='rnn_decoder0_'))
     decoder.add(mx.rnn.DotAttentionCell())
 
-#    encoder_data = mx.sym.Variable('encoder_data')
-#    decoder_data = mx.sym.Variable('decoder_data')
-
-    # assert outputs.list_outputs() == ['rnn_stack4_t0_out_output', 'rnn_stack4_t1_out_output', 'rnn_stack4_t2_out_output']
-    # args, outs, auxs = outputs.infer_shape(encoder_data=(10, 3, 50), decoder_data=(10, 3, 50))
-
     def sym_gen(seq_len):
         data = mx.sym.Variable('data')
         print(data.asnumpy())
@@ -367,11 +324,6 @@ def test(args):
         outputs = mx.sym.Group(outputs)
         print(type(outputs[0]))
 
-#        args, outs, auxs = outputs.infer_shape(encoder_data=(10, 3, 50), decoder_data=(10, 3, 50))
-#        print("args: %s" % args)
-#        print("outs: %s" % outs)
-#        print("auxs: %s" % auxs)
-
         pred = mx.sym.Reshape(outputs,
                 shape=(-1, args.num_hidden*(1+args.bidirectional)))
         pred = mx.sym.FullyConnected(data=pred, num_hidden=len(vocab), name='pred')
@@ -385,12 +337,6 @@ def test(args):
         contexts = [mx.gpu(int(i)) for i in args.gpus.split(',')]
     else:
         contexts = mx.cpu(0)
-
-#    model = mx.mod.BucketingModule(
-#        sym_gen             = sym_gen,
-#        default_bucket_key  = data_val.default_bucket_key,
-#        context             = contexts)
-#    model.bind(data_val.provide_data, data_val.provide_label, for_training=False)
 
     # note here we load using SequentialRNNCell instead of FusedRNNCell.
     _, arg_params, aux_params = mx.rnn.load_rnn_checkpoint(stack, args.model_prefix, args.load_epoch)
