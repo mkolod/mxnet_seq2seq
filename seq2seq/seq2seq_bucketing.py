@@ -116,6 +116,7 @@ def _normalize_sequence(length, inputs, layout, merge, in_layout=None):
             inputs = list(symbol.split(inputs, axis=in_axis, num_outputs=length,
                                        squeeze_axis=1))
     else: 
+        print("length = %d, len(inputs) = %d" % (length, len(inputs))) 
         assert length is None or len(inputs) == length
         if merge is True:
             inputs = [symbol.expand_dims(i, axis=axis) for i in inputs]
@@ -201,20 +202,55 @@ def decoder_unroll(decoder, target_embed, targ_vocab, unroll_length, go_symbol, 
         # Need to use hidden state from attention model, but <GO> as input
         outputs = []
 
-        # Replace this with a <GO> symbol
-        feed = inputs[0]
+        output, states = decoder(inputs[0], begin_state)
+        pred = mx.sym.Reshape(output, shape=(-1, args.num_hidden), name='output_reshape') 
+        pred = mx.sym.FullyConnected(data=pred, num_hidden=len(targ_vocab), name='pred')
+#        pred = mx.sym.SoftmaxOutput(data=pred, label=label, name='softmax')
+        output = mx.sym.argmax(pred, axis=1, keepdims=False, name='argmax')
 
-#         targ_embed = mx.sym.Embedding(data=targ_data, input_dim=len(targ_vocab),    # data=data
-#                                 output_dim=args.num_embed, name='targ_embed')       
+        feed = mx.sym.var('targ_data')
 
-#        foo = feed.forward()
-#        print(foo)
-#        output, states = decoder(feed, begin_state)
-#        pred2 = mx.sym.Reshape(output, shape=(-1, args.num_hidden), name='output_reshape') 
-#        pred2 = mx.sym.FullyConnected(data=pred2, num_hidden=len(targ_vocab), name='pred2')
-#        pred2 = mx.sym.SoftmaxOutput(data=pred2, label=label, name='softmax')
-#        output2 = mx.sym.argmax(pred2, axis=0, keepdims=False, name='argmax')
-#        output2, _ = _normalize_sequence(1, output2, layout, merge_outputs)
+        targ_embed_weight = mx.sym.var('targ_embedding_weight')
+        embed1 = mx.sym.Embedding(data=feed, input_dim=len(targ_vocab), 
+            output_dim=args.num_embed, weight=targ_embed_weight, name='infer_embed')
+
+        outs2 = []
+        states2 = []
+
+#        out, state = decoder(feed, begin_state)
+        out = None 
+
+        for i in range(unroll_length): #unroll_length - 1):
+            a = out if i > 0 else feed
+            state = begin_state if i == 0 else state
+            embed = mx.sym.Embedding(data=a, input_dim=len(targ_vocab), 
+                output_dim=args.num_embed, weight=targ_embed_weight, name='infer_embed_%d' % i)
+            out, state = decoder(embed, state)
+            outs2.append(out)
+            states2.append(state)
+            pred = mx.sym.Reshape(out, shape=(-1, args.num_hidden), name='output_reshape') 
+            pred = mx.sym.FullyConnected(data=pred, num_hidden=len(targ_vocab), name='pred')
+#        pred = mx.sym.SoftmaxOutput(data=pred, label=label, name='softmax')
+            out = mx.sym.argmax(pred, axis=1, keepdims=False, name='argmax')
+
+#        print(outs2)
+#        var = outs2[-1]
+#        arg_shapes, out_shapes, aux_shapes = var.infer_shape_partial() #targ_data=mx.nd.array(np.array([1, 2, 3])))
+#        print_inferred_shapes(var, arg_shapes, out_shapes, aux_shapes)
+       
+
+#        src_embed = mx.sym.Embedding(data=src_data, input_dim=len(src_vocab), 
+#                                 output_dim=args.num_embed, name='src_embed') 
+#        targ_embed = mx.sym.Embedding(data=targ_data, input_dim=len(targ_vocab),    # data=data
+#                                 output_dim=args.num_embed, name='targ_embed')
+
+
+
+
+
+
+
+#        output, _ = _normalize_sequence(1, output2, layout, merge_outputs)
 
 #        var = target_embed
 #        arg_shapes, out_shapes, aux_shapes = var.infer_shape_partial(targ_data=(55,1)) #src_data=(55,1), targ_data=(55,1))
@@ -224,8 +260,6 @@ def decoder_unroll(decoder, target_embed, targ_vocab, unroll_length, go_symbol, 
  #       output2, states = decoder(output2, states)
   #      arg_shapes, out_shapes, aux_shapes = output2.infer_shape_partial(src_data=(55,1), targ_data=(55,1))
    #     print_inferred_shapes(output2, arg_shapes, out_shapes, aux_shapes)
-#        output, states = decoder(output2, states)
-
 
 #        outputs, _ = _normalize_sequence(1, outputs, layout, merge_outputs)
 
@@ -233,20 +267,19 @@ def decoder_unroll(decoder, target_embed, targ_vocab, unroll_length, go_symbol, 
 
 #        embed = mx.sym.Embedding(data=pred_word_idx, input_dim=len(targ_vocab),
 #            output_dim=args.num_embed, name='src_embed') 
- 
-        tokens = [1, 2, 3]
-        outputs2 = []
-        curr_token = mx.sym.Variable('curr_token')
-        infer_embed = mx.sym.Embedding(data = curr_token, input_dim=len(targ_vocab),
-                                     output_dim=args.num_embed, name='infer_embed')
-        output2, states2 = decoder(curr_token)
-        for i in range(len(tokens)):
-            infer_embed.bind(
-                
-        
 
-        for i in range(0, unroll_length):
-            # this works            
+#	embed_mat = mx.nd.array(np.random.randn(50004, 500))
+ 
+#        for i in range(0, unroll_length):
+#            print("i = %d" % i)
+#            bound = target_embed.bind(mx.cpu(), {'targ_data': mx.nd.array([0]), 'targ_embed_weight': embed_mat})
+#            output, states = (bound, states)
+#            outputs.append(output)   
+
+            # this works
+
+
+        for i in range(unroll_length):
             output, states = decoder(inputs[i], states)
             outputs.append(output)
 #                print(target_embed.infer_shape_partial())
@@ -260,8 +293,12 @@ def decoder_unroll(decoder, target_embed, targ_vocab, unroll_length, go_symbol, 
 #                print_inferred_shapes(output, arg_shapes, out_shapes, aux_shapes)
 
         outputs, _ = _normalize_sequence(unroll_length, outputs, layout, merge_outputs)
-
-        return outputs, states
+ 
+        outs2, _ = _normalize_sequence(unroll_length, outs2, layout, merge_outputs)       
+ 
+        return outs2, states2
+ 
+#        return outputs, states
 
 def train(args):
 
@@ -286,7 +323,7 @@ def train(args):
 
     def sym_gen(seq_len):
         src_data = mx.sym.Variable('src_data')
-        targ_data = mx.sym.Variable('targ_data')
+        targ_data = mx.sym.Variable('targ_data') #'targ_data')
         label = mx.sym.Variable('softmax_label')
  
         src_embed = mx.sym.Embedding(data=src_data, input_dim=len(src_vocab), 
@@ -342,8 +379,7 @@ def train(args):
     else:
         contexts = mx.cpu(0)
 
-    # mx.mod.BucketingModule
-    model = mx.mod.BucketingModule(  # Seq2SeqBucketingModule(
+    model = mx.mod.BucketingModule( 
         sym_gen             = sym_gen,
         default_bucket_key  = data_train.default_bucket_key,
         context             = contexts)
