@@ -154,7 +154,6 @@ def get_data(layout):
     for i in range(5):
         print(array_to_text(valid_iter.targ_sent[i], train_iter.inv_targ_vocab))
     
-
     duration = time() - start
 
     print("\nDataset deserialization time: %.2f seconds\n" % duration)
@@ -183,10 +182,11 @@ def decoder_unroll(decoder, target_embed, targ_vocab, unroll_length, go_symbol, 
         pred = mx.sym.FullyConnected(data=pred, num_hidden=len(targ_vocab), name='pred')
         output = mx.sym.argmax(pred, name='argmax') 
 
-        pred_word_idx = mx.sym.Variable('pred_word_idx')
+        embed = mx.sym.Embedding(data=output, input_dim=len(targ_vocab),
+            output_dim=args.num_embed, name='interm_embed') 
 
-        embed = mx.sym.Embedding(data=pred_word_idx, input_dim=len(targ_vocab),
-            output_dim=args.num_embed, name='src_embed') 
+#        a, b, c = embed.infer_shape_partial()
+#        print_inferred_shapes(embed, a, b, c)
 
         for i in range(0, unroll_length):
             # this works            
