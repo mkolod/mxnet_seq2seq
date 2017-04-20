@@ -51,6 +51,8 @@ parser.add_argument('--batch-size', type=int, default=32,
                     help='the batch size.')
 parser.add_argument('--disp-batches', type=int, default=50,
                     help='show progress for every n batches')
+parser.add_argument('--max-grad-norm', type=float, default=5.0,
+                    help='maximum gradient norm (larger values will be clipped')
 # When training a deep, complex model, it's recommended to stack fused RNN cells (one
 # layer per cell) together instead of one with all layers. The reason is that fused RNN
 # cells doesn't set gradients to be ready until the computation for the entire layer is
@@ -274,6 +276,8 @@ def train(args):
 
     if args.optimizer not in ['adadelta', 'adagrad', 'adam', 'rmsprop']:
         opt_params['momentum'] = args.mom
+
+    opt_params['clip_gradient'] = args.max_grad_norm
 
     start = time()
 
