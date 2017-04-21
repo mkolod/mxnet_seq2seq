@@ -132,8 +132,6 @@ def get_data(layout):
 
     start = time()
 
-    print("\nUnpickling training iterator")
-
     with open('./data/train_iterator.pkl', 'rb') as f:
         train_iter = pickle.load(f)
  
