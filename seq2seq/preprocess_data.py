@@ -57,6 +57,9 @@ if __name__ == '__main__':
         )]
 
 
+    print(len(dataset.src_train_sent))
+    print(len(dataset.targ_train_sent))
+
     print("Constructing train iterator")
     start = time()
     train_iter = Seq2SeqIter(dataset.src_train_sent, dataset.targ_train_sent, dataset.src_vocab, dataset.inv_src_vocab,
@@ -68,7 +71,7 @@ if __name__ == '__main__':
 	 
     print("Serializing training set iterator.")
     start = time()
-    with open('./data/train_iterator.pkl', 'wb') as f:
+    with open('./data/train_iterator_2.pkl', 'wb') as f:
         pickle.dump(train_iter, f, pickle.HIGHEST_PROTOCOL)
     train_ser_duration = time() - start
     print("\nSerializing training iterator took %.4f seconds\n" % train_ser_duration)   
@@ -85,7 +88,7 @@ if __name__ == '__main__':
 
     print("Serializing validation set iterator.")
     start = time()
-    with open('./data/valid_iterator.pkl', 'wb') as f:
+    with open('./data/valid_iterator_2.pkl', 'wb') as f:
         pickle.dump(train_iter, f, pickle.HIGHEST_PROTOCOL)
     valid_ser_duration = time() - start
     print("\nSerializing validation set iterator took %.4f seconds\n" % valid_ser_duration)

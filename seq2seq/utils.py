@@ -111,12 +111,10 @@ def get_s2s_data(src_train_path, src_valid_path, targ_train_path, targ_valid_pat
     targ_valid_sent = tokenize_text(targ_valid_path, vocab=targ_dict)
 
     print("\nEncoded source language sentences:\n")
-    for i in range(5):
+    for i in range(10):
         print(array_to_text(src_train_sent[i], inv_src_dict))            
-
-    print("\nEncoded target language sentences:\n")
-    for i in range(5):
-        print(array_to_text(targ_train_sent[i], inv_targ_dict))            
+        print(array_to_text(targ_train_sent[i], inv_targ_dict))           
+        print("\n") 
 
 
     return Dataset(
