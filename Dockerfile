@@ -25,11 +25,11 @@ RUN apt-get update && apt-get -y upgrade && \
   libjpeg8-dev \
   zlib1g-dev 
 
-RUN pip install --upgrade --no-cache-dir numpy scipy matplotlib scikit-learn sympy nltk jupyter setuptools requests
+RUN pip install --upgrade numpy scipy matplotlib scikit-learn sympy nltk setuptools requests
 
 # Build MxNet for Python
 RUN cd /root && git clone --recursive https://github.com/dmlc/mxnet.git && cd mxnet && git checkout 6e81d76e6830b70a4a2278ebc08e9d3e3af1c937 && \
-  cp make/confi.mk . && \
+  cp make/config.mk . && \
     echo "USE_CUDA=1" >> config.mk && \
     echo "USE_CUDNN=1" >> config.mk && \
     echo "CUDA_ARCH :=" \
