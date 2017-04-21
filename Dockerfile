@@ -28,8 +28,8 @@ RUN apt-get update && apt-get -y upgrade && \
 RUN pip install --upgrade --no-cache-dir numpy scipy matplotlib scikit-learn sympy nltk jupyter setuptools requests
 
 # Build MxNet for Python
-RUN cd /root && git clone --recursive https://github.com/dmlc/mxnet.git && cd mxnet && git checkout bb7ad9daac5ba670c8e411930d54337d0e5bf7a6 && \
-  cp make/config.mk . && \
+RUN cd /root && git clone --recursive https://github.com/dmlc/mxnet.git && cd mxnet && git checkout 6e81d76e6830b70a4a2278ebc08e9d3e3af1c937 && \
+  cp make/confi.mk . && \
     echo "USE_CUDA=1" >> config.mk && \
     echo "USE_CUDNN=1" >> config.mk && \
     echo "CUDA_ARCH :=" \
