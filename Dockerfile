@@ -31,7 +31,7 @@ COPY speedometer_reset.patch /root
 
 # Build MxNet for Python
 RUN cd /root && git clone --recursive https://github.com/dmlc/mxnet.git && cp speedometer_reset.patch /root/mxnet/ && \
-  cd mxnet && git checkout 955f6be6977ca1a27d3e912fd62a08f019dd1f76 && \
+  cd mxnet && git checkout 955f6be6977ca1a27d3e912fd62a08f019dd1f76 && git apply speedometer_reset.patch && \
   cp make/config.mk . && \
     echo "USE_CUDA=1" >> config.mk && \
     echo "USE_CUDNN=1" >> config.mk && \
