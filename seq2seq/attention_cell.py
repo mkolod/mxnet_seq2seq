@@ -39,6 +39,10 @@ class AttentionEncoderCell(mx.rnn.BaseRNNCell):
     def state_shape(self):
         return []
 
+    @property
+    def state_info(self):
+        return [{'shape': (), '__layout__': 'NT'}]
+
     def __call__(self, inputs, states):
         return inputs, states + [symbol.expand_dims(inputs, axis=1)]
 
@@ -52,6 +56,7 @@ class AttentionEncoderCell(mx.rnn.BaseRNNCell):
         # attention cell always use NTC layout for states
         states, _ = _normalize_sequence(None, states, 'NTC', True, layout)
         return outputs, [states]
+
 
 
 def _attention_pooling(source, scores):
@@ -94,3 +99,12 @@ class DotAttentionCell(BaseAttentionCell):
         scores = symbol.batch_dot(source, inputs)
         # (batch_size, encoder_num_hidden)
         return _attention_pooling(source, scores), states
+
+    @property
+    def state_shape(self):
+        return []
+
+    @property
+    def state_info(self):
+        return [{'shape': (), '__layout__': 'NT'}]
+
