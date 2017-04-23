@@ -4,7 +4,8 @@ import argparse
 import cPickle as pickle
 #import dill as pickle
 
-from rnn_cell import LSTMCell, SequentialRNNCell
+from mxnet.rnn import LSTMCell, SequentialRNNCell
+#from rnn_cell import LSTMCell, SequentialRNNCell
 
 from time import time
 import re
@@ -13,6 +14,8 @@ from unidecode import unidecode
 from utils import array_to_text, tokenize_text, invert_dict, get_s2s_data, Dataset
 
 from seq2seq_iterator import *
+
+# from metric import Perplexity
 
 from attention_cell import AttentionEncoderCell, DotAttentionCell
 
@@ -132,7 +135,9 @@ def get_data(layout):
 
     start = time()
 
-    with open('./data/train_iterator.pkl', 'rb') as f:
+    print("\nUnpickling training iterator")
+
+    with open('./data/train_iterator.pkl', 'rb') as f: # _en_de.pkl
         train_iter = pickle.load(f)
  
     train_iter.initialize()
@@ -140,7 +145,7 @@ def get_data(layout):
 
     print("\nUnpickling validation iterator")
 
-    with open('./data/valid_iterator.pkl', 'rb') as f:
+    with open('./data/valid_iterator.pkl', 'rb') as f: # _en_de.pkl
         valid_iter = pickle.load(f)
  
     valid_iter.initialize()
@@ -248,6 +253,11 @@ def train(args):
         pred = mx.sym.SoftmaxOutput(data=pred, label=label, name='softmax')
 
         return pred, ('src_data', 'targ_data',), ('softmax_label',)
+
+
+#    foo, _, _ = sym_gen((1, 1))
+#    print(type(foo))
+#    mx.viz.plot_network(symbol=foo).save('./seq2seq.dot')
 
 
     if args.gpus:
