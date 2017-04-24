@@ -137,7 +137,7 @@ def get_data(layout):
 
     print("\nUnpickling training iterator")
 
-    with open('./data/train_iterator.pkl', 'rb') as f: # _en_de.pkl
+    with open('./data/train_iterator_en_de.pkl', 'rb') as f: # _en_de.pkl
         train_iter = pickle.load(f)
  
     train_iter.initialize()
@@ -145,7 +145,7 @@ def get_data(layout):
 
     print("\nUnpickling validation iterator")
 
-    with open('./data/valid_iterator.pkl', 'rb') as f: # _en_de.pkl
+    with open('./data/valid_iterator_en_de.pkl', 'rb') as f: # _en_de.pkl
         valid_iter = pickle.load(f)
  
     valid_iter.initialize()
@@ -301,7 +301,7 @@ def train(args):
         aux_params          = aux_params,
         begin_epoch         = args.load_epoch,
         num_epoch           = args.num_epochs,
-        batch_end_callback  = mx.callback.Speedometer(args.batch_size, args.disp_batches),
+        batch_end_callback  = mx.callback.Speedometer(batch_size=args.batch_size, frequent=args.disp_batches, auto_reset=True),
         epoch_end_callback  = mx.rnn.do_rnn_checkpoint(decoder, args.model_prefix, 1)
                               if args.model_prefix else None)
 
