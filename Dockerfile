@@ -27,7 +27,7 @@ RUN apt-get update && apt-get -y upgrade && \
 
 RUN pip install --upgrade numpy scipy matplotlib scikit-learn sympy nltk setuptools requests
 
-COPY speedometer_reset.patch /root
+COPY nan.patch /root
 
 # Build MxNet for Python
 RUN cd /root && git clone --recursive https://github.com/dmlc/mxnet.git && cp nan.patch /root/mxnet/ && \

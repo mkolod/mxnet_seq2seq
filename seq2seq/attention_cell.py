@@ -25,7 +25,7 @@ def _normalize_sequence(length, inputs, layout, merge, in_layout=None):
             in_axis = axis
 
     if isinstance(inputs, symbol.Symbol) and axis != in_axis:
-        inputs = symbol.swapaxes(inputs, dim0=axis, dim1=in_axis)
+        inputs = symbol.swapaxes(inputs, dim1=axis, dim2=in_axis)
 
     return inputs, axis
 

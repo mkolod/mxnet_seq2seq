@@ -4,7 +4,7 @@ import argparse
 import cPickle as pickle
 #import dill as pickle
 
-from mxnet.rnn import LSTMCell, SequentialRNNCell
+from mxnet.rnn import LSTMCell, SequentialRNNCell, FusedRNNCell
 #from rnn_cell import LSTMCell, SequentialRNNCell
 
 from time import time
@@ -137,7 +137,7 @@ def get_data(layout):
 
     print("\nUnpickling training iterator")
 
-    with open('./data/train_iterator.pkl', 'rb') as f: # _en_de.pkl
+    with open('./data/train_iterator_2.pkl', 'rb') as f: # _en_de.pkl
         train_iter = pickle.load(f)
  
     train_iter.initialize()
@@ -145,7 +145,7 @@ def get_data(layout):
 
     print("\nUnpickling validation iterator")
 
-    with open('./data/valid_iterator.pkl', 'rb') as f: # _en_de.pkl
+    with open('./data/valid_iterator_2.pkl', 'rb') as f: # _en_de.pkl
         valid_iter = pickle.load(f)
  
     valid_iter.initialize()
@@ -210,17 +210,24 @@ def train(args):
 
     encoder = SequentialRNNCell()
 
-    for i in range(args.num_layers):
-        encoder.add(LSTMCell(args.num_hidden, prefix='rnn_encoder%d_' % i))
-        if i < args.num_layers - 1 and args.dropout > 0.0:
-            encoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_encoder%d_' % i))
+    encoder.add(mx.rnn.FusedRNNCell(args.num_hidden, num_layers=args.num_layers, dropout=args.dropout,
+        mode='lstm', prefix='lstm_encoder', bidirectional=args.bidirectional, get_next_state=True))
+
+#    for i in range(args.num_layers):
+#        encoder.add(LSTMCell(args.num_hidden, prefix='rnn_encoder%d_' % i))
+#        if i < args.num_layers - 1 and args.dropout > 0.0:
+#            encoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_encoder%d_' % i))
     encoder.add(AttentionEncoderCell())
 
     decoder = mx.rnn.SequentialRNNCell()
-    for i in range(args.num_layers):
-        decoder.add(LSTMCell(args.num_hidden, prefix=('rnn_decoder%d_' % i)))
-        if i < args.num_layers - 1 and args.dropout > 0.0:
-            decoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_decoder%d_' % i))
+
+    decoder.add(mx.rnn.FusedRNNCell(args.num_hidden, num_layers=args.num_layers, 
+        mode='lstm', prefix='lstm_decoder', bidirectional=args.bidirectional, get_next_state=True))
+
+#    for i in range(args.num_layers):
+#        decoder.add(LSTMCell(args.num_hidden, prefix=('rnn_decoder%d_' % i)))
+#        if i < args.num_layers - 1 and args.dropout > 0.0:
+#            decoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_decoder%d_' % i))
     decoder.add(DotAttentionCell())
 
     def sym_gen(seq_len):
@@ -243,7 +250,8 @@ def train(args):
 
         # This should be based on EOS or max seq len for inference, but here we unroll to the target length
         # TODO: fix <GO> symbol
-        outputs, _ = decoder_unroll(decoder, targ_embed, targ_vocab, dec_seq_len, 0, begin_state=states, layout='TNC', merge_outputs=True)
+        outputs, _ = decoder.unroll(dec_seq_len, targ_embed, begin_state=states, layout=layout, merge_outputs=True)
+#        outputs, _ = decoder_unroll(decoder, targ_embed, targ_vocab, dec_seq_len, 0, begin_state=states, layout='TNC', merge_outputs=True)
 
         pred = mx.sym.Reshape(outputs,
                 shape=(-1, args.num_hidden)) # -1
