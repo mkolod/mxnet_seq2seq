@@ -137,7 +137,7 @@ def get_data(layout):
 
     print("\nUnpickling training iterator")
 
-    with open('./data/train_iterator_2.pkl', 'rb') as f: # _en_de.pkl
+    with open('./data/train_iterator.pkl', 'rb') as f: # _en_de.pkl
         train_iter = pickle.load(f)
  
     train_iter.initialize()
@@ -145,7 +145,7 @@ def get_data(layout):
 
     print("\nUnpickling validation iterator")
 
-    with open('./data/valid_iterator_2.pkl', 'rb') as f: # _en_de.pkl
+    with open('./data/valid_iterator.pkl', 'rb') as f: # _en_de.pkl
         valid_iter = pickle.load(f)
  
     valid_iter.initialize()
@@ -180,15 +180,15 @@ def decoder_unroll(decoder, target_embed, targ_vocab, unroll_length, go_symbol, 
         outputs = []
 
         # Replace this with a <GO> symbol
-        feed = inputs[0]
-        output, states = decoder(feed, states)
+#        feed = inputs[0]
+#        output, states = decoder(feed, states)
 
-        pred = mx.sym.Reshape(output, shape=(-1, args.num_hidden), name='output_reshape') 
-        pred = mx.sym.FullyConnected(data=pred, num_hidden=len(targ_vocab), name='pred')
-        output = mx.sym.argmax(pred, name='argmax') 
+#        pred = mx.sym.Reshape(output, shape=(-1, args.num_hidden), name='output_reshape') 
+#        pred = mx.sym.FullyConnected(data=pred, num_hidden=len(targ_vocab), name='pred')
+#        output = mx.sym.argmax(pred, name='argmax') 
 
-        embed = mx.sym.Embedding(data=output, input_dim=len(targ_vocab),
-            output_dim=args.num_embed, name='interm_embed') 
+#        embed = mx.sym.Embedding(data=output, input_dim=len(targ_vocab),
+#            output_dim=args.num_embed, name='interm_embed') 
 
 #        a, b, c = embed.infer_shape_partial()
 #        print_inferred_shapes(embed, a, b, c)
