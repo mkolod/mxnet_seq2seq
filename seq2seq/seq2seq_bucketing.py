@@ -68,7 +68,7 @@ parser.add_argument('--dropout', type=float, default='0.0',
                     help='dropout probability (1.0 - keep probability)')
 
 #buckets = [32]
-buckets = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+# buckets = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
 
 start_label = 1
 invalid_label = 0
@@ -137,7 +137,7 @@ def get_data(layout):
 
     print("\nUnpickling training iterator")
 
-    with open('./data/train_iterator_2.pkl', 'rb') as f: # _en_de.pkl
+    with open('./data/train_iterator.pkl', 'rb') as f: # _en_de.pkl
         train_iter = pickle.load(f)
  
     train_iter.initialize()
@@ -145,7 +145,7 @@ def get_data(layout):
 
     print("\nUnpickling validation iterator")
 
-    with open('./data/valid_iterator_2.pkl', 'rb') as f: # _en_de.pkl
+    with open('./data/valid_iterator.pkl', 'rb') as f: # _en_de.pkl
         valid_iter = pickle.load(f)
  
     valid_iter.initialize()
@@ -179,24 +179,40 @@ def decoder_unroll(decoder, target_embed, targ_vocab, unroll_length, go_symbol, 
         states = begin_state
         outputs = []
 
+        embed = inputs[0]
+        # embed = mx.sym.Embedding(data=feed, input_dim=len(targ_vocab),
+        #     output_dim=args.num_embed, name='decoder_embed_0') 
+
+        # this works            
         # Replace this with a <GO> symbol
-        feed = inputs[0]
-        output, states = decoder(feed, states)
+        # for i in range(0, unroll_length):
+        #    output, states = decoder(inputs[i], states)
+        #    outputs.append(output)
 
-        pred = mx.sym.Reshape(output, shape=(-1, args.num_hidden), name='output_reshape') 
-        pred = mx.sym.FullyConnected(data=pred, num_hidden=len(targ_vocab), name='pred')
-        output = mx.sym.argmax(pred, name='argmax') 
+        # feed has to be an MxNet variable bound using the bind method
+        # feed = np.array(3, args.batch_size)
+        # feed = mx.nd.full(shape=(1, args.batch_size), val=3)
+        # feed = mx.sym.Variable(name='feed')
+        # feed = mx.sym.arange(start=3, stop=3, step=1, repeat=args.batch_size, name='feed')
 
-        embed = mx.sym.Embedding(data=output, input_dim=len(targ_vocab),
-            output_dim=args.num_embed, name='interm_embed') 
+        # embed = mx.sym.Embedding(data=feed, input_dim=len(targ_vocab),
+        #     output_dim=args.num_embed, name='decoder_embed_0') 
 
-#        a, b, c = embed.infer_shape_partial()
-#        print_inferred_shapes(embed, a, b, c)
+        # for i in range(0, unroll_length):
+        #     output1, states = decoder(embed, states)
+        #     pred2 = mx.sym.FullyConnected(data=output1, num_hidden=len(targ_vocab), name='pred_%d' % i)
+        #     output2 = mx.sym.argmax(data=pred2, name='argmax_%d' % i, axis=1)
+        #     outputs.append(output2)
+        #     embed = mx.sym.Embedding(data=output2, input_dim=len(targ_vocab),
+        #         output_dim=args.num_embed, name='interm_embed_%d' % i)
 
         for i in range(0, unroll_length):
-            # this works            
-            output, states = decoder(inputs[i], states)
+            output, states = decoder(embed, states)
+            pred = mx.sym.FullyConnected(data=output, num_hidden=len(targ_vocab))
+            output = mx.sym.argmax(data=pred, axis=1)
             outputs.append(output)
+            embed = mx.sym.Embedding(data=output, input_dim=len(targ_vocab),
+                output_dim=args.num_embed)
 
         outputs, _ = _normalize_sequence(unroll_length, outputs, layout, merge_outputs)
 
@@ -207,6 +223,7 @@ def train(args):
     from time import time
 
     data_train, data_val, src_vocab, targ_vocab = get_data('TN')
+    print "len(src_vocab) len(targ_vocab)", len(src_vocab), len(targ_vocab)
 
     encoder = SequentialRNNCell()
 
@@ -253,12 +270,12 @@ def train(args):
         outputs, _ = decoder.unroll(dec_seq_len, targ_embed, begin_state=states, layout=layout, merge_outputs=True)
 #        outputs, _ = decoder_unroll(decoder, targ_embed, targ_vocab, dec_seq_len, 0, begin_state=states, layout='TNC', merge_outputs=True)
 
-        pred = mx.sym.Reshape(outputs,
-                shape=(-1, args.num_hidden)) # -1
-        pred = mx.sym.FullyConnected(data=pred, num_hidden=len(targ_vocab), name='pred')
-        label = mx.sym.Reshape(data=label, shape=(-1,))
+        # pred = mx.sym.Reshape(outputs,
+        #         shape=(-1, args.num_hidden)) # -1
+        # pred = mx.sym.FullyConnected(data=outputs, num_hidden=len(targ_vocab), name='pred')
+        # label = mx.sym.Reshape(data=label, shape=(-1,))
 
-        pred = mx.sym.SoftmaxOutput(data=pred, label=label, name='softmax')
+        pred = mx.sym.SoftmaxOutput(data=outputs, label=label, name='softmax')
 
         return pred, ('src_data', 'targ_data',), ('softmax_label',)
 
