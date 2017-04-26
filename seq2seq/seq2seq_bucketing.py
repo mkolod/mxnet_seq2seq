@@ -180,39 +180,28 @@ def decoder_unroll(decoder, target_embed, targ_vocab, unroll_length, go_symbol, 
         outputs = []
 
         embed = inputs[0]
-        # embed = mx.sym.Embedding(data=feed, input_dim=len(targ_vocab),
-        #     output_dim=args.num_embed, name='decoder_embed_0') 
 
-        # this works            
-        # Replace this with a <GO> symbol
+        # OLD
         # for i in range(0, unroll_length):
-        #    output, states = decoder(inputs[i], states)
+        #    output, states = decoder(inputs[i], states) # inputs[i] = output = (128, 500)
         #    outputs.append(output)
 
-        # feed has to be an MxNet variable bound using the bind method
-        # feed = np.array(3, args.batch_size)
-        # feed = mx.nd.full(shape=(1, args.batch_size), val=3)
-        # feed = mx.sym.Variable(name='feed')
-        # feed = mx.sym.arange(start=3, stop=3, step=1, repeat=args.batch_size, name='feed')
-
-        # embed = mx.sym.Embedding(data=feed, input_dim=len(targ_vocab),
-        #     output_dim=args.num_embed, name='decoder_embed_0') 
-
+        # NEW 1
+        # fc_weight = mx.sym.Variable('fc_weight')
+        # fc_bias = mx.sym.Variable('fc_bias')
+        # em_weight = mx.sym.Variable('em_weight')
         # for i in range(0, unroll_length):
-        #     output1, states = decoder(embed, states)
-        #     pred2 = mx.sym.FullyConnected(data=output1, num_hidden=len(targ_vocab), name='pred_%d' % i)
-        #     output2 = mx.sym.argmax(data=pred2, name='argmax_%d' % i, axis=1)
-        #     outputs.append(output2)
-        #     embed = mx.sym.Embedding(data=output2, input_dim=len(targ_vocab),
-        #         output_dim=args.num_embed, name='interm_embed_%d' % i)
+        #     output, states = decoder(embed, states)
+        #     outputs.append(embed)
+        #     fc = mx.sym.FullyConnected(data=output, weight=fc_weight, bias=fc_bias, num_hidden=len(targ_vocab), name='decoder_fc%d_'%i)
+        #     am = mx.sym.argmax(data=fc, axis=1)
+        #     embed = mx.sym.Embedding(data=am, weight=em_weight, input_dim=len(targ_vocab),
+        #         output_dim=args.num_embed, name='decoder_embed%d_'%i)
 
+        # NEW 2
         for i in range(0, unroll_length):
-            output, states = decoder(embed, states)
-            pred = mx.sym.FullyConnected(data=output, num_hidden=len(targ_vocab))
-            output = mx.sym.argmax(data=pred, axis=1)
-            outputs.append(output)
-            embed = mx.sym.Embedding(data=output, input_dim=len(targ_vocab),
-                output_dim=args.num_embed)
+            embed, states = decoder(embed, states)
+            outputs.append(embed)
 
         outputs, _ = _normalize_sequence(unroll_length, outputs, layout, merge_outputs)
 
@@ -227,24 +216,24 @@ def train(args):
 
     encoder = SequentialRNNCell()
 
-    encoder.add(mx.rnn.FusedRNNCell(args.num_hidden, num_layers=args.num_layers, dropout=args.dropout,
-        mode='lstm', prefix='lstm_encoder', bidirectional=args.bidirectional, get_next_state=True))
+    # encoder.add(mx.rnn.FusedRNNCell(args.num_hidden, num_layers=args.num_layers, dropout=args.dropout,
+    #     mode='lstm', prefix='lstm_encoder', bidirectional=args.bidirectional, get_next_state=True))
 
-#    for i in range(args.num_layers):
-#        encoder.add(LSTMCell(args.num_hidden, prefix='rnn_encoder%d_' % i))
-#        if i < args.num_layers - 1 and args.dropout > 0.0:
-#            encoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_encoder%d_' % i))
+    for i in range(args.num_layers):
+       encoder.add(LSTMCell(args.num_hidden, prefix='rnn_encoder%d_' % i))
+       if i < args.num_layers - 1 and args.dropout > 0.0:
+           encoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_encoder%d_' % i))
     encoder.add(AttentionEncoderCell())
 
     decoder = mx.rnn.SequentialRNNCell()
 
-    decoder.add(mx.rnn.FusedRNNCell(args.num_hidden, num_layers=args.num_layers, 
-        mode='lstm', prefix='lstm_decoder', bidirectional=args.bidirectional, get_next_state=True))
+    # decoder.add(mx.rnn.FusedRNNCell(args.num_hidden, num_layers=args.num_layers, 
+    #     mode='lstm', prefix='lstm_decoder', bidirectional=args.bidirectional, get_next_state=True))
 
-#    for i in range(args.num_layers):
-#        decoder.add(LSTMCell(args.num_hidden, prefix=('rnn_decoder%d_' % i)))
-#        if i < args.num_layers - 1 and args.dropout > 0.0:
-#            decoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_decoder%d_' % i))
+    for i in range(args.num_layers):
+       decoder.add(LSTMCell(args.num_hidden, prefix=('rnn_decoder%d_' % i)))
+       if i < args.num_layers - 1 and args.dropout > 0.0:
+           decoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_decoder%d_' % i))
     decoder.add(DotAttentionCell())
 
     def sym_gen(seq_len):
@@ -267,15 +256,14 @@ def train(args):
 
         # This should be based on EOS or max seq len for inference, but here we unroll to the target length
         # TODO: fix <GO> symbol
-        outputs, _ = decoder.unroll(dec_seq_len, targ_embed, begin_state=states, layout=layout, merge_outputs=True)
-#        outputs, _ = decoder_unroll(decoder, targ_embed, targ_vocab, dec_seq_len, 0, begin_state=states, layout='TNC', merge_outputs=True)
+        # outputs, _ = decoder.unroll(dec_seq_len, targ_embed, begin_state=states, layout=layout, merge_outputs=True)
+        outputs, _ = decoder_unroll(decoder, targ_embed, targ_vocab, dec_seq_len, 0, begin_state=states, layout='TNC', merge_outputs=True)
 
-        # pred = mx.sym.Reshape(outputs,
-        #         shape=(-1, args.num_hidden)) # -1
-        # pred = mx.sym.FullyConnected(data=outputs, num_hidden=len(targ_vocab), name='pred')
-        # label = mx.sym.Reshape(data=label, shape=(-1,))
-
-        pred = mx.sym.SoftmaxOutput(data=outputs, label=label, name='softmax')
+        # NEW
+        rs = mx.sym.Reshape(outputs, shape=(-1, args.num_hidden), name='sym_gen_reshape1')
+        fc = mx.sym.FullyConnected(data=rs, num_hidden=len(targ_vocab), name='sym_gen_fc')
+        label_rs = mx.sym.Reshape(data=label, shape=(-1,), name='sym_gen_reshape2')
+        pred = mx.sym.SoftmaxOutput(data=fc, label=label_rs, name='sym_gen_softmax')
 
         return pred, ('src_data', 'targ_data',), ('softmax_label',)
 
