@@ -137,7 +137,7 @@ def get_data(layout):
 
     print("\nUnpickling training iterator")
 
-    with open('./data/train_iterator_2.pkl', 'rb') as f: # _en_de.pkl
+    with open('./data/train_iterator.pkl', 'rb') as f: # _en_de.pkl
         train_iter = pickle.load(f)
  
     train_iter.initialize()
@@ -145,7 +145,7 @@ def get_data(layout):
 
     print("\nUnpickling validation iterator")
 
-    with open('./data/valid_iterator_2.pkl', 'rb') as f: # _en_de.pkl
+    with open('./data/valid_iterator.pkl', 'rb') as f: # _en_de.pkl
         valid_iter = pickle.load(f)
  
     valid_iter.initialize()
@@ -180,11 +180,6 @@ def decoder_unroll(decoder, target_embed, targ_vocab, unroll_length, go_symbol, 
         outputs = []
 
         embed = inputs[0]
-
-        # OLD
-        # for i in range(0, unroll_length):
-        #    output, states = decoder(inputs[i], states) # inputs[i] = output = (128, 500)
-        #    outputs.append(output)
 
         # NEW 1
         # fc_weight = mx.sym.Variable('fc_weight')
