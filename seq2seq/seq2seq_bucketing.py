@@ -216,24 +216,24 @@ def train(args):
 
     encoder = SequentialRNNCell()
 
-    encoder.add(mx.rnn.FusedRNNCell(args.num_hidden, num_layers=args.num_layers, dropout=args.dropout,
-        mode='lstm', prefix='lstm_encoder', bidirectional=args.bidirectional, get_next_state=True))
+#    encoder.add(mx.rnn.FusedRNNCell(args.num_hidden, num_layers=args.num_layers, dropout=args.dropout,
+#        mode='lstm', prefix='lstm_encoder', bidirectional=args.bidirectional, get_next_state=True))
 
-#    for i in range(args.num_layers):
-#       encoder.add(LSTMCell(args.num_hidden, prefix='rnn_encoder%d_' % i))
-#       if i < args.num_layers - 1 and args.dropout > 0.0:
-#           encoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_encoder%d_' % i))
+    for i in range(args.num_layers):
+       encoder.add(LSTMCell(args.num_hidden, prefix='rnn_encoder%d_' % i))
+       if i < args.num_layers - 1 and args.dropout > 0.0:
+           encoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_encoder%d_' % i))
     encoder.add(AttentionEncoderCell())
 
     decoder = mx.rnn.SequentialRNNCell()
 
-    decoder.add(mx.rnn.FusedRNNCell(args.num_hidden, num_layers=args.num_layers, 
-        mode='lstm', prefix='lstm_decoder', bidirectional=args.bidirectional, get_next_state=True))
+#    decoder.add(mx.rnn.FusedRNNCell(args.num_hidden, num_layers=args.num_layers, 
+#        mode='lstm', prefix='lstm_decoder', bidirectional=args.bidirectional, get_next_state=True))
 
-#    for i in range(args.num_layers):
-#       decoder.add(LSTMCell(args.num_hidden, prefix=('rnn_decoder%d_' % i)))
-#       if i < args.num_layers - 1 and args.dropout > 0.0:
-#           decoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_decoder%d_' % i))
+    for i in range(args.num_layers):
+       decoder.add(LSTMCell(args.num_hidden, prefix=('rnn_decoder%d_' % i)))
+       if i < args.num_layers - 1 and args.dropout > 0.0:
+           decoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_decoder%d_' % i))
     decoder.add(DotAttentionCell())
 
     def sym_gen(seq_len):
@@ -331,24 +331,24 @@ def infer(args):
 
     encoder = SequentialRNNCell()
 
-    encoder.add(mx.rnn.FusedRNNCell(args.num_hidden, num_layers=args.num_layers, dropout=args.dropout,
-        mode='lstm', prefix='lstm_encoder', bidirectional=args.bidirectional, get_next_state=True).unfuse())
+#    encoder.add(mx.rnn.FusedRNNCell(args.num_hidden, num_layers=args.num_layers, dropout=args.dropout,
+#        mode='lstm', prefix='lstm_encoder', bidirectional=args.bidirectional, get_next_state=True).unfuse())
 
-#    for i in range(args.num_layers):
-#       encoder.add(LSTMCell(args.num_hidden, prefix='rnn_encoder%d_' % i))
-#       if i < args.num_layers - 1 and args.dropout > 0.0:
-#           encoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_encoder%d_' % i))
+    for i in range(args.num_layers):
+       encoder.add(LSTMCell(args.num_hidden, prefix='rnn_encoder%d_' % i))
+       if i < args.num_layers - 1 and args.dropout > 0.0:
+           encoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_encoder%d_' % i))
     encoder.add(AttentionEncoderCell())
 
     decoder = mx.rnn.SequentialRNNCell()
 
-    decoder.add(mx.rnn.FusedRNNCell(args.num_hidden, num_layers=args.num_layers, 
-        mode='lstm', prefix='lstm_decoder', bidirectional=args.bidirectional, get_next_state=True).unfuse())
+#    decoder.add(mx.rnn.FusedRNNCell(args.num_hidden, num_layers=args.num_layers, 
+#        mode='lstm', prefix='lstm_decoder', bidirectional=args.bidirectional, get_next_state=True).unfuse())
 
-#    for i in range(args.num_layers):
-#       decoder.add(LSTMCell(args.num_hidden, prefix=('rnn_decoder%d_' % i)))
-#       if i < args.num_layers - 1 and args.dropout > 0.0:
-#           decoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_decoder%d_' % i))
+    for i in range(args.num_layers):
+       decoder.add(LSTMCell(args.num_hidden, prefix=('rnn_decoder%d_' % i)))
+       if i < args.num_layers - 1 and args.dropout > 0.0:
+           decoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_decoder%d_' % i))
     decoder.add(DotAttentionCell())
 
     def sym_gen(seq_len):
@@ -411,23 +411,10 @@ def infer(args):
 
     start = time()
 
-    model.fit(
-        train_data          = data_train,
-        eval_data           = data_val,
-        eval_metric         = mx.metric.Perplexity(invalid_label),
-        kvstore             = args.kv_store,
-        optimizer           = args.optimizer,
-        optimizer_params    = opt_params, 
-        initializer         = mx.init.Xavier(factor_type="in", magnitude=2.34),
-        arg_params          = arg_params,
-        aux_params          = aux_params,
-        begin_epoch         = args.load_epoch,
-        num_epoch           = args.num_epochs,
-        batch_end_callback  = mx.callback.Speedometer(batch_size=args.batch_size, frequent=args.disp_batches, auto_reset=True),
-        epoch_end_callback  = mx.rnn.do_rnn_checkpoint(decoder, args.model_prefix, 1)
-                              if args.model_prefix else None)
 
-    train_duration = time() - start
+    model.score(data_val, mx.metric.Perplexity(invalid_label),
+                batch_end_callback=mx.callback.Speedometer(args.batch_size, 5))
+
     time_per_epoch = train_duration / args.num_epochs
     print("\n\nTime per epoch: %.2f seconds\n\n" % time_per_epoch)
 
