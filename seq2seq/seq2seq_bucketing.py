@@ -21,8 +21,8 @@ from attention_cell import AttentionEncoderCell, DotAttentionCell
 
 parser = argparse.ArgumentParser(description="Train RNN on Penn Tree Bank",
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument('--test', default=False, action='store_true',
-                    help='whether to do testing instead of training')
+parser.add_argument('--infer', default=False, action='store_true',
+                    help='whether to do inference instead of training')
 parser.add_argument('--model-prefix', type=str, default=None,
                     help='path to save/load model')
 parser.add_argument('--load-epoch', type=int, default=0,
@@ -137,7 +137,7 @@ def get_data(layout):
 
     print("\nUnpickling training iterator")
 
-    with open('./data/train_iterator.pkl', 'rb') as f: # _en_de.pkl
+    with open('./data/train_iterator_2.pkl', 'rb') as f: # _en_de.pkl
         train_iter = pickle.load(f)
  
     train_iter.initialize()
@@ -145,7 +145,7 @@ def get_data(layout):
 
     print("\nUnpickling validation iterator")
 
-    with open('./data/valid_iterator.pkl', 'rb') as f: # _en_de.pkl
+    with open('./data/valid_iterator_2.pkl', 'rb') as f: # _en_de.pkl
         valid_iter = pickle.load(f)
  
     valid_iter.initialize()
@@ -216,24 +216,24 @@ def train(args):
 
     encoder = SequentialRNNCell()
 
-    # encoder.add(mx.rnn.FusedRNNCell(args.num_hidden, num_layers=args.num_layers, dropout=args.dropout,
-    #     mode='lstm', prefix='lstm_encoder', bidirectional=args.bidirectional, get_next_state=True))
+    encoder.add(mx.rnn.FusedRNNCell(args.num_hidden, num_layers=args.num_layers, dropout=args.dropout,
+        mode='lstm', prefix='lstm_encoder', bidirectional=args.bidirectional, get_next_state=True))
 
-    for i in range(args.num_layers):
-       encoder.add(LSTMCell(args.num_hidden, prefix='rnn_encoder%d_' % i))
-       if i < args.num_layers - 1 and args.dropout > 0.0:
-           encoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_encoder%d_' % i))
+#    for i in range(args.num_layers):
+#       encoder.add(LSTMCell(args.num_hidden, prefix='rnn_encoder%d_' % i))
+#       if i < args.num_layers - 1 and args.dropout > 0.0:
+#           encoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_encoder%d_' % i))
     encoder.add(AttentionEncoderCell())
 
     decoder = mx.rnn.SequentialRNNCell()
 
-    # decoder.add(mx.rnn.FusedRNNCell(args.num_hidden, num_layers=args.num_layers, 
-    #     mode='lstm', prefix='lstm_decoder', bidirectional=args.bidirectional, get_next_state=True))
+    decoder.add(mx.rnn.FusedRNNCell(args.num_hidden, num_layers=args.num_layers, 
+        mode='lstm', prefix='lstm_decoder', bidirectional=args.bidirectional, get_next_state=True))
 
-    for i in range(args.num_layers):
-       decoder.add(LSTMCell(args.num_hidden, prefix=('rnn_decoder%d_' % i)))
-       if i < args.num_layers - 1 and args.dropout > 0.0:
-           decoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_decoder%d_' % i))
+#    for i in range(args.num_layers):
+#       decoder.add(LSTMCell(args.num_hidden, prefix=('rnn_decoder%d_' % i)))
+#       if i < args.num_layers - 1 and args.dropout > 0.0:
+#           decoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_decoder%d_' % i))
     decoder.add(DotAttentionCell())
 
     def sym_gen(seq_len):
@@ -256,8 +256,8 @@ def train(args):
 
         # This should be based on EOS or max seq len for inference, but here we unroll to the target length
         # TODO: fix <GO> symbol
-        # outputs, _ = decoder.unroll(dec_seq_len, targ_embed, begin_state=states, layout=layout, merge_outputs=True)
-        outputs, _ = decoder_unroll(decoder, targ_embed, targ_vocab, dec_seq_len, 0, begin_state=states, layout='TNC', merge_outputs=True)
+        outputs, _ = decoder.unroll(dec_seq_len, targ_embed, begin_state=states, layout=layout, merge_outputs=True)
+#        outputs, _ = decoder_unroll(decoder, targ_embed, targ_vocab, dec_seq_len, 0, begin_state=states, layout='TNC', merge_outputs=True)
 
         # NEW
         rs = mx.sym.Reshape(outputs, shape=(-1, args.num_hidden), name='sym_gen_reshape1')
@@ -322,53 +322,114 @@ def train(args):
     time_per_epoch = train_duration / args.num_epochs
     print("\n\nTime per epoch: %.2f seconds\n\n" % time_per_epoch)
 
-def test(args):
+def infer(args):
     assert args.model_prefix, "Must specifiy path to load from"
-    _, data_val, vocab = get_data('TN') # NT
 
-    encoder = mx.rnn.SequentialRNNCell()
-    encoder.add(mx.rnn.LSTMCell(args.num_hidden, prefix='rnn_encoder0_'))
-    encoder.add(mx.rnn.AttentionEncoderCell())
+    data_train, data_val, src_vocab, targ_vocab = get_data('TN')
+
+    print "len(src_vocab) len(targ_vocab)", len(src_vocab), len(targ_vocab)
+
+    encoder = SequentialRNNCell()
+
+    encoder.add(mx.rnn.FusedRNNCell(args.num_hidden, num_layers=args.num_layers, dropout=args.dropout,
+        mode='lstm', prefix='lstm_encoder', bidirectional=args.bidirectional, get_next_state=True).unfuse())
+
+#    for i in range(args.num_layers):
+#       encoder.add(LSTMCell(args.num_hidden, prefix='rnn_encoder%d_' % i))
+#       if i < args.num_layers - 1 and args.dropout > 0.0:
+#           encoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_encoder%d_' % i))
+    encoder.add(AttentionEncoderCell())
 
     decoder = mx.rnn.SequentialRNNCell()
-    decoder.add(mx.rnn.LSTMCell(args.num_hidden, prefix='rnn_decoder0_'))
-    decoder.add(mx.rnn.DotAttentionCell())
+
+    decoder.add(mx.rnn.FusedRNNCell(args.num_hidden, num_layers=args.num_layers, 
+        mode='lstm', prefix='lstm_decoder', bidirectional=args.bidirectional, get_next_state=True).unfuse())
+
+#    for i in range(args.num_layers):
+#       decoder.add(LSTMCell(args.num_hidden, prefix=('rnn_decoder%d_' % i)))
+#       if i < args.num_layers - 1 and args.dropout > 0.0:
+#           decoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_decoder%d_' % i))
+    decoder.add(DotAttentionCell())
 
     def sym_gen(seq_len):
-        data = mx.sym.Variable('data')
-        print(data.asnumpy())
+        src_data = mx.sym.Variable('src_data')
+        targ_data = mx.sym.Variable('targ_data')
         label = mx.sym.Variable('softmax_label')
-        embed = mx.sym.Embedding(data=data, input_dim=len(vocab),
-                                 output_dim=args.num_embed, name='embed')
+ 
+        src_embed = mx.sym.Embedding(data=src_data, input_dim=len(src_vocab), 
+                                 output_dim=args.num_embed, name='src_embed') 
+        targ_embed = mx.sym.Embedding(data=targ_data, input_dim=len(targ_vocab),    # data=data
+                                 output_dim=args.num_embed, name='targ_embed')
 
         encoder.reset()
         decoder.reset()
 
-        _, states = encoder.unroll(seq_len, inputs=embed)
-        outputs, _ = decoder.unroll(seq_len, inputs=embed, begin_state=states)
-        outputs = mx.sym.Group(outputs)
-        print(type(outputs[0]))
+        enc_seq_len, dec_seq_len = seq_len
 
-        pred = mx.sym.Reshape(outputs,
-                shape=(-1, args.num_hidden*(1+args.bidirectional)))
-        pred = mx.sym.FullyConnected(data=pred, num_hidden=len(vocab), name='pred')
+        layout = 'TNC'
+        _, states = encoder.unroll(enc_seq_len, inputs=src_embed, layout=layout)
 
-        label = mx.sym.Reshape(label, shape=(-1,))
-        pred = mx.sym.SoftmaxOutput(data=pred, label=label, name='softmax')
+        # This should be based on EOS or max seq len for inference, but here we unroll to the target length
+        # TODO: fix <GO> symbol
+        # outputs, _ = decoder.unroll(dec_seq_len, targ_embed, begin_state=states, layout=layout, merge_outputs=True)
+        outputs, _ = decoder_unroll(decoder, targ_embed, targ_vocab, dec_seq_len, 0, begin_state=states, layout='TNC', merge_outputs=True)
 
-        return pred, ('data',), ('softmax_label',)
+        # NEW
+        rs = mx.sym.Reshape(outputs, shape=(-1, args.num_hidden), name='sym_gen_reshape1')
+        fc = mx.sym.FullyConnected(data=rs, num_hidden=len(targ_vocab), name='sym_gen_fc')
+        label_rs = mx.sym.Reshape(data=label, shape=(-1,), name='sym_gen_reshape2')
+        pred = mx.sym.SoftmaxOutput(data=fc, label=label_rs, name='sym_gen_softmax')
+
+        return pred, ('src_data', 'targ_data',), ('softmax_label',)
 
     if args.gpus:
         contexts = [mx.gpu(int(i)) for i in args.gpus.split(',')]
     else:
         contexts = mx.cpu(0)
 
-    # note here we load using SequentialRNNCell instead of FusedRNNCell.
-    _, arg_params, aux_params = mx.rnn.load_rnn_checkpoint(stack, args.model_prefix, args.load_epoch)
-    model.set_params(arg_params, aux_params)
+    model = mx.mod.BucketingModule( 
+        sym_gen             = sym_gen,
+        default_bucket_key  = data_train.default_bucket_key,
+        context             = contexts)
 
-    model.score(data_val, mx.metric.Perplexity(invalid_label),
-                batch_end_callback=mx.callback.Speedometer(args.batch_size, 5))
+    if args.load_epoch:
+        _, arg_params, aux_params = mx.rnn.load_rnn_checkpoint(
+            decoder, args.model_prefix, args.load_epoch)
+    else:
+        arg_params = None
+        aux_params = None
+
+    opt_params = {
+      'learning_rate': args.lr,
+      'wd': args.wd
+    }
+
+    if args.optimizer not in ['adadelta', 'adagrad', 'adam', 'rmsprop']:
+        opt_params['momentum'] = args.mom
+
+    opt_params['clip_gradient'] = args.max_grad_norm
+
+    start = time()
+
+    model.fit(
+        train_data          = data_train,
+        eval_data           = data_val,
+        eval_metric         = mx.metric.Perplexity(invalid_label),
+        kvstore             = args.kv_store,
+        optimizer           = args.optimizer,
+        optimizer_params    = opt_params, 
+        initializer         = mx.init.Xavier(factor_type="in", magnitude=2.34),
+        arg_params          = arg_params,
+        aux_params          = aux_params,
+        begin_epoch         = args.load_epoch,
+        num_epoch           = args.num_epochs,
+        batch_end_callback  = mx.callback.Speedometer(batch_size=args.batch_size, frequent=args.disp_batches, auto_reset=True),
+        epoch_end_callback  = mx.rnn.do_rnn_checkpoint(decoder, args.model_prefix, 1)
+                              if args.model_prefix else None)
+
+    train_duration = time() - start
+    time_per_epoch = train_duration / args.num_epochs
+    print("\n\nTime per epoch: %.2f seconds\n\n" % time_per_epoch)
 
 if __name__ == '__main__':
     import logging
@@ -385,9 +446,9 @@ if __name__ == '__main__':
     if args.num_layers >= 4 and len(args.gpus.split(',')) >= 4 and not args.stack_rnn:
         print('WARNING: stack-rnn is recommended to train complex model on multiple GPUs')
 
-    if args.test:
+    if args.infer:
         # Demonstrates how to load a model trained with CuDNN RNN and predict
         # with non-fused MXNet symbol
-        test(args)
+        infer(args)
     else:
         train(args)
