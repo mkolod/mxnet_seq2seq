@@ -66,6 +66,8 @@ parser.add_argument('--stack-rnn', default=False,
                     help='stack fused RNN cells to reduce communication overhead')
 parser.add_argument('--dropout', type=float, default='0.0',
                     help='dropout probability (1.0 - keep probability)')
+parser.add_argument('--use-cudnn-cells', action='store_true',
+                    help='Use CUDNN LSTM (mx.rnn.FusedRNNCell) for training instead of in-graph LSTM cells (mx.rnn.LSTMCell)')
 
 #buckets = [32]
 # buckets = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
@@ -137,7 +139,7 @@ def get_data(layout):
 
     print("\nUnpickling training iterator")
 
-    with open('./data/train_iterator.pkl', 'rb') as f: # _en_de.pkl
+    with open('./data/train_iterator_2.pkl', 'rb') as f: # _en_de.pkl
         train_iter = pickle.load(f)
  
     train_iter.initialize()
@@ -145,7 +147,7 @@ def get_data(layout):
 
     print("\nUnpickling validation iterator")
 
-    with open('./data/valid_iterator.pkl', 'rb') as f: # _en_de.pkl
+    with open('./data/valid_iterator_2.pkl', 'rb') as f: # _en_de.pkl
         valid_iter = pickle.load(f)
  
     valid_iter.initialize()
@@ -211,24 +213,26 @@ def train(args):
 
     encoder = SequentialRNNCell()
 
-#    encoder.add(mx.rnn.FusedRNNCell(args.num_hidden, num_layers=args.num_layers, dropout=args.dropout,
-#        mode='lstm', prefix='lstm_encoder', bidirectional=args.bidirectional, get_next_state=True))
-
-    for i in range(args.num_layers):
-       encoder.add(LSTMCell(args.num_hidden, prefix='rnn_encoder%d_' % i))
-       if i < args.num_layers - 1 and args.dropout > 0.0:
-           encoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_encoder%d_' % i))
+    if args.use_cudnn_cells:
+        encoder.add(mx.rnn.FusedRNNCell(args.num_hidden, num_layers=args.num_layers, dropout=args.dropout,
+            mode='lstm', prefix='lstm_encoder', bidirectional=args.bidirectional, get_next_state=True))
+    else:
+        for i in range(args.num_layers):
+            encoder.add(LSTMCell(args.num_hidden, prefix='rnn_encoder%d_' % i))
+            if i < args.num_layers - 1 and args.dropout > 0.0:
+                encoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_encoder%d_' % i))
     encoder.add(AttentionEncoderCell())
 
     decoder = mx.rnn.SequentialRNNCell()
 
-#    decoder.add(mx.rnn.FusedRNNCell(args.num_hidden, num_layers=args.num_layers, 
-#        mode='lstm', prefix='lstm_decoder', bidirectional=args.bidirectional, get_next_state=True))
-
-    for i in range(args.num_layers):
-       decoder.add(LSTMCell(args.num_hidden, prefix=('rnn_decoder%d_' % i)))
-       if i < args.num_layers - 1 and args.dropout > 0.0:
-           decoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_decoder%d_' % i))
+    if args.use_cudnn_cells:
+        decoder.add(mx.rnn.FusedRNNCell(args.num_hidden, num_layers=args.num_layers, 
+            mode='lstm', prefix='lstm_decoder', bidirectional=args.bidirectional, get_next_state=True))
+    else:
+        for i in range(args.num_layers):
+            decoder.add(LSTMCell(args.num_hidden, prefix=('rnn_decoder%d_' % i)))
+            if i < args.num_layers - 1 and args.dropout > 0.0:
+                decoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_decoder%d_' % i))
     decoder.add(DotAttentionCell())
 
     def sym_gen(seq_len):
@@ -324,33 +328,31 @@ def infer(args):
 
     print "len(src_vocab) len(targ_vocab)", len(src_vocab), len(targ_vocab)
 
-    encoder = SequentialRNNCell()
+    if args.use_cudnn_cells:
+        encoder = mx.rnn.FusedRNNCell(args.num_hidden, num_layers=args.num_layers, dropout=args.dropout,
+            mode='lstm', prefix='lstm_encoder', bidirectional=args.bidirectional, get_next_state=True).unfuse()
 
-#    encoder.add(mx.rnn.FusedRNNCell(args.num_hidden, num_layers=args.num_layers, dropout=args.dropout,
-#        mode='lstm', prefix='lstm_encoder', bidirectional=args.bidirectional, get_next_state=True).unfuse())
+    else:
+        encoder = SequentialRNNCell()
 
-    for i in range(args.num_layers):
-       encoder.add(LSTMCell(args.num_hidden, prefix='rnn_encoder%d_' % i))
-       if i < args.num_layers - 1 and args.dropout > 0.0:
-           encoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_encoder%d_' % i))
+        for i in range(args.num_layers):
+            encoder.add(LSTMCell(args.num_hidden, prefix='rnn_encoder%d_' % i))
+            if i < args.num_layers - 1 and args.dropout > 0.0:
+                encoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_encoder%d_' % i))
 
-#    encoder = mx.rnn.FusedRNNCell(args.num_hidden, num_layers=args.num_layers, dropout=args.dropout,
-#        mode='lstm', prefix='lstm_encoder', bidirectional=args.bidirectional, get_next_state=True).unfuse()
- 
     encoder.add(AttentionEncoderCell())
 
-    decoder = mx.rnn.SequentialRNNCell()
+    if args.use_cudnn_cells:
+        decoder = mx.rnn.FusedRNNCell(args.num_hidden, num_layers=args.num_layers, 
+            mode='lstm', prefix='lstm_decoder', bidirectional=args.bidirectional, get_next_state=True).unfuse()
+ 
+    else:
+        decoder = mx.rnn.SequentialRNNCell()
 
-#    decoder.add(mx.rnn.FusedRNNCell(args.num_hidden, num_layers=args.num_layers, 
-#        mode='lstm', prefix='lstm_decoder', bidirectional=args.bidirectional, get_next_state=True).unfuse())
-
-    for i in range(args.num_layers):
-       decoder.add(LSTMCell(args.num_hidden, prefix=('rnn_decoder%d_' % i)))
-       if i < args.num_layers - 1 and args.dropout > 0.0:
-           decoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_decoder%d_' % i))
-
-#    decoder = mx.rnn.FusedRNNCell(args.num_hidden, num_layers=args.num_layers, 
-#        mode='lstm', prefix='lstm_decoder', bidirectional=args.bidirectional, get_next_state=True).unfuse()
+        for i in range(args.num_layers):
+            decoder.add(LSTMCell(args.num_hidden, prefix=('rnn_decoder%d_' % i)))
+            if i < args.num_layers - 1 and args.dropout > 0.0:
+                decoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_decoder%d_' % i))
 
     decoder.add(DotAttentionCell())
 
