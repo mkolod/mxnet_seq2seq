@@ -3,8 +3,8 @@ mkdir -p data/
 cd data/ 
 
 # check if exists and use cached version
-#wget http://statmt.org/europarl/v7/es-en.tgz
-#tar xvf es-en.tgz && rm es-en.tgz
+wget http://statmt.org/europarl/v7/es-en.tgz
+tar xvf es-en.tgz && rm es-en.tgz
 
 TRAIN_SENT_CT=10000
 VAL_SENT_CT=1000
