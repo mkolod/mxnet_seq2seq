@@ -3,9 +3,12 @@ import mxnet as mx
 import argparse
 import cPickle as pickle
 #import dill as pickle
+import math
+import nltk
 
 from mxnet.rnn import LSTMCell, SequentialRNNCell, FusedRNNCell
 #from rnn_cell import LSTMCell, SequentialRNNCell
+from itertools import takewhile, dropwhile
 
 from time import time
 import re
@@ -14,8 +17,6 @@ from unidecode import unidecode
 from utils import array_to_text, tokenize_text, invert_dict, get_s2s_data, Dataset
 
 from seq2seq_iterator import *
-
-# from metric import Perplexity
 
 from attention_cell import AttentionEncoderCell, DotAttentionCell
 
@@ -74,6 +75,8 @@ parser.add_argument('--use-cudnn-cells', action='store_true',
 
 start_label = 1
 invalid_label = 0
+
+reserved_tokens={'<PAD>':0, '<UNK>':1, '<EOS>':2, '<GO>':3}
 
 def print_inferred_shapes(node, arg_shapes, aux_shapes, out_shapes):
     args = node.list_arguments()
@@ -184,16 +187,16 @@ def decoder_unroll(decoder, target_embed, targ_vocab, unroll_length, go_symbol, 
         embed = inputs[0]
 
         # NEW 1
-        # fc_weight = mx.sym.Variable('fc_weight')
-        # fc_bias = mx.sym.Variable('fc_bias')
-        # em_weight = mx.sym.Variable('em_weight')
-        # for i in range(0, unroll_length):
-        #     output, states = decoder(embed, states)
-        #     outputs.append(embed)
-        #     fc = mx.sym.FullyConnected(data=output, weight=fc_weight, bias=fc_bias, num_hidden=len(targ_vocab), name='decoder_fc%d_'%i)
-        #     am = mx.sym.argmax(data=fc, axis=1)
-        #     embed = mx.sym.Embedding(data=am, weight=em_weight, input_dim=len(targ_vocab),
-        #         output_dim=args.num_embed, name='decoder_embed%d_'%i)
+#        fc_weight = mx.sym.Variable('fc_weight')
+#        fc_bias = mx.sym.Variable('fc_bias')
+#        em_weight = mx.sym.Variable('em_weight')
+#        for i in range(0, unroll_length):
+#            output, states = decoder(embed, states)
+#            outputs.append(embed)
+#            fc = mx.sym.FullyConnected(data=output, weight=fc_weight, bias=fc_bias, num_hidden=len(targ_vocab), name='decoder_fc%d_'%i)
+#            am = mx.sym.argmax(data=fc, axis=1)
+#            embed = mx.sym.Embedding(data=am, weight=em_weight, input_dim=len(targ_vocab),
+#                output_dim=args.num_embed, name='decoder_embed%d_'%i)
 
         # NEW 2
         for i in range(0, unroll_length):
@@ -321,6 +324,50 @@ def train(args):
     time_per_epoch = train_duration / args.num_epochs
     print("\n\nTime per epoch: %.2f seconds\n\n" % time_per_epoch)
 
+class BleuScore(mx.metric.EvalMetric):
+    def __init__(self, ignore_label, axis=-1):
+        super(BleuScore, self).__init__('BleuScore')
+        self.ignore_label = ignore_label
+        self.axis = axis
+
+    def update(self, labels, preds):
+        assert len(labels) == len(preds)
+
+        def drop_sentinels(text_lst):
+            sentinels = lambda x: x == reserved_tokens['<PAD>'] or x == reserved_tokens['<GO>']
+            text_lst = dropwhile(lambda x: sentinels(x), text_lst)
+            text_lst = takewhile(lambda x: not sentinels(x) and x != reserved_tokens['<EOS>'], text_lst)
+            return list(text_lst)
+
+        smoothing_fn = nltk.translate.bleu_score.SmoothingFunction().method3
+
+        for label, pred in zip(labels, preds):
+            maxed = mx.ndarray.argmax(data=pred, axis=1)
+            pred_nparr = maxed.asnumpy()
+            label_nparr = label.asnumpy().astype(np.int32) 
+            sent_len, batch_size = np.shape(label_nparr)
+            pred_nparr = pred_nparr.reshape(sent_len, batch_size).astype(np.int32)
+
+            for i in range(batch_size):
+                exp_lst = drop_sentinels(label_nparr[:, i].tolist())
+                act_lst = drop_sentinels(pred_nparr[:, i].tolist())
+                expected = exp_lst
+                actual = act_lst
+                bleu = nltk.translate.bleu_score.sentence_bleu(
+                    references=[expected], hypothesis=actual, weights=(0.25, 0.25, 0.25, 0.25),
+                    smoothing_function = smoothing_fn 
+                )
+#                print("bleu: %f" % bleu)
+                self.sum_metric += bleu
+                self.num_inst += 1
+            assert label.size == pred.size/pred.shape[-1], \
+                "shape mismatch: %s vs. %s"%(label.shape, pred.shape)
+
+    def get(self):
+        num = self.num_inst if self.num_inst > 0 else float('nan')
+        return (self.name, self.sum_metric/num)
+
+
 def infer(args):
     assert args.model_prefix, "Must specifiy path to load from"
 
@@ -420,7 +467,8 @@ def infer(args):
 
     start = time()
 
-    model.score(data_val, mx.metric.Perplexity(invalid_label),
+    # mx.metric.Perplexity
+    model.score(data_val, BleuScore(invalid_label), #PPL(invalid_label),
                 batch_end_callback=mx.callback.Speedometer(batch_size=args.batch_size, frequent=5, auto_reset=True))
 
     infer_duration = time() - start
