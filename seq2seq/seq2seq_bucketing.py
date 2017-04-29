@@ -124,7 +124,7 @@ def _normalize_sequence(length, inputs, layout, merge, in_layout=None):
                 "to list with list(inputs) first or let unroll handle splitting."
             inputs = list(symbol.split(inputs, axis=in_axis, num_outputs=length,
                                        squeeze_axis=1))
-    else: 
+    else:
         assert length is None or len(inputs) == length
         if merge is True:
             inputs = [symbol.expand_dims(i, axis=axis) for i in inputs]
@@ -144,7 +144,7 @@ def get_data(layout):
 
     with open('./data/train_iterator.pkl', 'rb') as f: # _en_de.pkl
         train_iter = pickle.load(f)
- 
+
     train_iter.initialize()
     train_iter.batch_size = args.batch_size
 
@@ -152,7 +152,7 @@ def get_data(layout):
 
     with open('./data/valid_iterator.pkl', 'rb') as f: # _en_de.pkl
         valid_iter = pickle.load(f)
- 
+
     valid_iter.initialize()
     valid_iter.batch_size = args.batch_size
 
@@ -163,7 +163,7 @@ def get_data(layout):
     print("\nEncoded target language sentences:\n")
     for i in range(5):
         print(array_to_text(valid_iter.targ_sent[i], train_iter.inv_targ_vocab))
-    
+
     duration = time() - start
 
     print("\nDataset deserialization time: %.2f seconds\n" % duration)
@@ -218,33 +218,40 @@ def train(args):
 
     if args.use_cudnn_cells:
         encoder.add(mx.rnn.FusedRNNCell(args.num_hidden, num_layers=args.num_layers, dropout=args.dropout,
-            mode='lstm', prefix='lstm_encoder', bidirectional=args.bidirectional, get_next_state=True))
+            mode='lstm', prefix='lstm_encoder_', bidirectional=args.bidirectional, get_next_state=True))
     else:
         for i in range(args.num_layers):
-            encoder.add(LSTMCell(args.num_hidden, prefix='rnn_encoder%d_' % i))
+            if args.bidirectional:
+                encoder.add(
+                        mx.rnn.BidirectionalCell(
+                            LSTMCell(args.num_hidden, prefix='lstm_encoder_l%d_'%i),
+                            LSTMCell(args.num_hidden, prefix='lstm_encoder_r%d_'%i),
+                            output_prefix='lstm_encoder_bi_l%d_'%i))
+            else:
+                encoder.add(LSTMCell(args.num_hidden, prefix='lstm_encoder_l%d_'%i))
             if i < args.num_layers - 1 and args.dropout > 0.0:
-                encoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_encoder%d_' % i))
+                encoder.add(mx.rnn.DropoutCell(args.dropout, prefix='lstm_encoder__dropout%d_' % i))
     encoder.add(AttentionEncoderCell())
 
     decoder = mx.rnn.SequentialRNNCell()
 
     if args.use_cudnn_cells:
-        decoder.add(mx.rnn.FusedRNNCell(args.num_hidden, num_layers=args.num_layers, 
-            mode='lstm', prefix='lstm_decoder', bidirectional=args.bidirectional, get_next_state=True))
+        decoder.add(mx.rnn.FusedRNNCell(args.num_hidden, num_layers=args.num_layers,
+            mode='lstm', prefix='lstm_decoder_', bidirectional=False, get_next_state=True))
     else:
         for i in range(args.num_layers):
-            decoder.add(LSTMCell(args.num_hidden, prefix=('rnn_decoder%d_' % i)))
+            decoder.add(LSTMCell(args.num_hidden, prefix=('lstm_decoder_l%d_' % i)))
             if i < args.num_layers - 1 and args.dropout > 0.0:
-                decoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_decoder%d_' % i))
+                decoder.add(mx.rnn.DropoutCell(args.dropout, prefix='lstm_decoder_l%d_' % i))
     decoder.add(DotAttentionCell())
 
     def sym_gen(seq_len):
         src_data = mx.sym.Variable('src_data')
         targ_data = mx.sym.Variable('targ_data')
         label = mx.sym.Variable('softmax_label')
- 
-        src_embed = mx.sym.Embedding(data=src_data, input_dim=len(src_vocab), 
-                                 output_dim=args.num_embed, name='src_embed') 
+
+        src_embed = mx.sym.Embedding(data=src_data, input_dim=len(src_vocab),
+                                 output_dim=args.num_embed, name='src_embed')
         targ_embed = mx.sym.Embedding(data=targ_data, input_dim=len(targ_vocab),    # data=data
                                  output_dim=args.num_embed, name='targ_embed')
 
@@ -280,7 +287,7 @@ def train(args):
     else:
         contexts = mx.cpu(0)
 
-    model = mx.mod.BucketingModule( 
+    model = mx.mod.BucketingModule(
         sym_gen             = sym_gen,
         default_bucket_key  = data_train.default_bucket_key,
         context             = contexts)
@@ -310,7 +317,7 @@ def train(args):
         eval_metric         = mx.metric.Perplexity(invalid_label),
         kvstore             = args.kv_store,
         optimizer           = args.optimizer,
-        optimizer_params    = opt_params, 
+        optimizer_params    = opt_params,
         initializer         = mx.init.Xavier(factor_type="in", magnitude=2.34),
         arg_params          = arg_params,
         aux_params          = aux_params,
@@ -375,41 +382,46 @@ def infer(args):
 
     print "len(src_vocab) len(targ_vocab)", len(src_vocab), len(targ_vocab)
 
+    encoder = SequentialRNNCell()
     if args.use_cudnn_cells:
-        encoder = mx.rnn.FusedRNNCell(args.num_hidden, num_layers=args.num_layers, dropout=args.dropout,
-            mode='lstm', prefix='lstm_encoder', bidirectional=args.bidirectional, get_next_state=True).unfuse()
+        encoder.add(mx.rnn.FusedRNNCell(args.num_hidden, num_layers=args.num_layers, dropout=args.dropout,
+            mode='lstm', prefix='lstm_encoder_', bidirectional=args.bidirectional,
+            get_next_state=True).unfuse())
 
     else:
-        encoder = SequentialRNNCell()
-
         for i in range(args.num_layers):
-            encoder.add(LSTMCell(args.num_hidden, prefix='rnn_encoder%d_' % i))
+            if args.bidirectional:
+                encoder.add(
+                        mx.rnn.BidirectionalCell(
+                            LSTMCell(args.num_hidden, prefix='lstm_encoder_l%d_'%i),
+                            LSTMCell(args.num_hidden, prefix='lstm_encoder_r%d_'%i),
+                            output_prefix='lstm_encoder_bi_l%d_'%i))
+            else:
+                encoder.add(LSTMCell(args.num_hidden, prefix='lstm_encoder_l%d_'%i))
             if i < args.num_layers - 1 and args.dropout > 0.0:
-                encoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_encoder%d_' % i))
+                encoder.add(mx.rnn.DropoutCell(args.dropout, prefix='lstm_encoder__dropout%d_' % i))
 
     encoder.add(AttentionEncoderCell())
 
+    decoder = mx.rnn.SequentialRNNCell()
+
     if args.use_cudnn_cells:
-        decoder = mx.rnn.FusedRNNCell(args.num_hidden, num_layers=args.num_layers, 
-            mode='lstm', prefix='lstm_decoder', bidirectional=args.bidirectional, get_next_state=True).unfuse()
- 
+        decoder.add(mx.rnn.FusedRNNCell(args.num_hidden, num_layers=args.num_layers,
+            mode='lstm', prefix='lstm_decoder_', bidirectional=False, get_next_state=True)).unfuse()
     else:
-        decoder = mx.rnn.SequentialRNNCell()
-
         for i in range(args.num_layers):
-            decoder.add(LSTMCell(args.num_hidden, prefix=('rnn_decoder%d_' % i)))
+            decoder.add(LSTMCell(args.num_hidden, prefix=('lstm_decoder_l%d_' % i)))
             if i < args.num_layers - 1 and args.dropout > 0.0:
-                decoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_decoder%d_' % i))
-
+                decoder.add(mx.rnn.DropoutCell(args.dropout, prefix='lstm_decoder_l%d_' % i))
     decoder.add(DotAttentionCell())
 
     def sym_gen(seq_len):
         src_data = mx.sym.Variable('src_data')
         targ_data = mx.sym.Variable('targ_data')
         label = mx.sym.Variable('softmax_label')
- 
-        src_embed = mx.sym.Embedding(data=src_data, input_dim=len(src_vocab), 
-                                 output_dim=args.num_embed, name='src_embed') 
+
+        src_embed = mx.sym.Embedding(data=src_data, input_dim=len(src_vocab),
+                                 output_dim=args.num_embed, name='src_embed')
         targ_embed = mx.sym.Embedding(data=targ_data, input_dim=len(targ_vocab),    # data=data
                                  output_dim=args.num_embed, name='targ_embed')
 
@@ -439,7 +451,7 @@ def infer(args):
     else:
         contexts = mx.cpu(0)
 
-    model = mx.mod.BucketingModule( 
+    model = mx.mod.BucketingModule(
         sym_gen             = sym_gen,
         default_bucket_key  = data_train.default_bucket_key,
         context             = contexts)
@@ -485,7 +497,7 @@ if __name__ == '__main__':
         contexts = [mx.gpu(int(i)) for i in args.gpus.split(',')]
     else:
         contexts = mx.cpu(0)
-    
+
 
     if args.num_layers >= 4 and len(args.gpus.split(',')) >= 4 and not args.stack_rnn:
         print('WARNING: stack-rnn is recommended to train complex model on multiple GPUs')
