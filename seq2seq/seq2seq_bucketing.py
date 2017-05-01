@@ -426,7 +426,8 @@ def infer(args):
  
         src_embed = mx.sym.Embedding(data=src_data, input_dim=len(src_vocab), 
                                  output_dim=args.num_embed, name='src_embed') 
-        targ_embed = mx.sym.Embedding(data=targ_data, input_dim=len(targ_vocab),    # data=data
+        targ_embed = mx.sym.Embedding(data=targ_data, input_dim=len(targ_vocab),
+                                 weight = targ_em_weight,    # data=data
                                  output_dim=args.num_embed, name='targ_embed')
 
         encoder.reset()
@@ -473,7 +474,7 @@ def infer(args):
     if args.load_epoch:
         _, arg_params, aux_params = mx.rnn.load_rnn_checkpoint(
             [encoder, decoder], args.model_prefix, args.load_epoch)
-        print(arg_params)
+#        print(arg_params)
         model.set_params(arg_params, aux_params)
 
     else:
