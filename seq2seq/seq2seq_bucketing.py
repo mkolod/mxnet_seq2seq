@@ -70,6 +70,9 @@ parser.add_argument('--dropout', type=float, default='0.0',
 parser.add_argument('--use-cudnn-cells', action='store_true',
                     help='Use CUDNN LSTM (mx.rnn.FusedRNNCell) for training instead of in-graph LSTM cells (mx.rnn.LSTMCell)')
 
+parser.add_argument('--inference-unrolling-for-training', action='store_true',
+                    help='Feed previous prediction (instead of previous ground truth) into the decoder input during training')
+
 #buckets = [32]
 # buckets = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
 
@@ -258,8 +261,10 @@ def train(args):
 
         # This should be based on EOS or max seq len for inference, but here we unroll to the target length
         # TODO: fix <GO> symbol
-        outputs, _ = decoder.unroll(dec_seq_len, targ_embed, begin_state=states, layout=layout, merge_outputs=True)
-#        outputs, _ = decoder_unroll(decoder, targ_embed, targ_vocab, dec_seq_len, 0, begin_state=states, layout='TNC', merge_outputs=True)
+        if args.inference_unrolling_for_training:
+            outputs, _ = decoder_unroll(decoder, targ_embed, targ_vocab, dec_seq_len, 0, begin_state=states, layout='TNC', merge_outputs=True)
+        else:
+            outputs, _ = decoder.unroll(dec_seq_len, targ_embed, begin_state=states, layout=layout, merge_outputs=True)
 
         # NEW
         rs = mx.sym.Reshape(outputs, shape=(-1, args.num_hidden), name='sym_gen_reshape1')
@@ -423,8 +428,8 @@ def infer(args):
 
         # This should be based on EOS or max seq len for inference, but here we unroll to the target length
         # TODO: fix <GO> symbol
-#        outputs, _ = decoder.unroll(dec_seq_len, targ_embed, begin_state=states, layout=layout, merge_outputs=True)
-        outputs, _ = decoder_unroll(decoder, targ_embed, targ_vocab, dec_seq_len, 0, begin_state=states, layout='TNC', merge_outputs=True)
+        outputs, _ = decoder.unroll(dec_seq_len, targ_embed, begin_state=states, layout=layout, merge_outputs=True)
+#        outputs, _ = decoder_unroll(decoder, targ_embed, targ_vocab, dec_seq_len, 0, begin_state=states, layout='TNC', merge_outputs=True)
 
         # NEW
         rs = mx.sym.Reshape(outputs, shape=(-1, args.num_hidden), name='sym_gen_reshape1')
@@ -485,7 +490,8 @@ if __name__ == '__main__':
         contexts = [mx.gpu(int(i)) for i in args.gpus.split(',')]
     else:
         contexts = mx.cpu(0)
-    
+   
+    print("\n") 
 
     if args.num_layers >= 4 and len(args.gpus.split(',')) >= 4 and not args.stack_rnn:
         print('WARNING: stack-rnn is recommended to train complex model on multiple GPUs')
@@ -495,4 +501,8 @@ if __name__ == '__main__':
         # with non-fused MXNet symbol
         infer(args)
     else:
+        if args.inference_unrolling_for_training:
+            print("INFO: Using inference decoder unrolling for training")
+        else:
+            print("INFO: Using regular decoder unrolling for training")
         train(args)
