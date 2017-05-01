@@ -339,7 +339,7 @@ class BleuScore(mx.metric.EvalMetric):
             text_lst = takewhile(lambda x: not sentinels(x) and x != reserved_tokens['<EOS>'], text_lst)
             return list(text_lst)
 
-        smoothing_fn = nltk.translate.bleu_score.SmoothingFunction().method3
+        smoothing_fn = nltk.translate.bleu_score.SmoothingFunction().method3 # method3
 
         for label, pred in zip(labels, preds):
             maxed = mx.ndarray.argmax(data=pred, axis=1)

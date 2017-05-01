@@ -28,10 +28,10 @@ if __name__ == '__main__':
     start = time()
 
     dataset = get_s2s_data(
-        src_train_path= './data/wmt15-de-en/train.en',
-        src_valid_path= './data/wmt15-de-en/valid.en',
-        targ_train_path= './data/wmt15-de-en/train.de',
-        targ_valid_path= './data/wmt15-de-en/valid.de' 
+        src_train_path= './data/wmt15-de-en/train.de',
+        src_valid_path= './data/wmt15-de-en/valid.de',
+        targ_train_path= './data/wmt15-de-en/train.en',
+        targ_valid_path= './data/wmt15-de-en/valid.en' 
     )
 
 #    dataset = get_s2s_data(
@@ -63,7 +63,7 @@ if __name__ == '__main__':
     print("Constructing train iterator")
     start = time()
     train_iter = Seq2SeqIter(dataset.src_train_sent, dataset.targ_train_sent, dataset.src_vocab, dataset.inv_src_vocab,
-                     dataset.targ_vocab, dataset.inv_targ_vocab, layout='TN', batch_size=64, buckets=all_pairs, max_sent_len=max_len)
+                     dataset.targ_vocab, dataset.inv_targ_vocab, layout='TN', batch_size=256, buckets=all_pairs, max_sent_len=max_len)
 
     train_iter.bucketize()
     train_iter_duration = time() - start
@@ -80,7 +80,7 @@ if __name__ == '__main__':
     print("Constructing valid iterator")
     valid_iter_duration = time()
     valid_iter = Seq2SeqIter(dataset.src_valid_sent, dataset.targ_valid_sent, dataset.src_vocab, dataset.inv_src_vocab,
-                     dataset.targ_vocab, dataset.inv_targ_vocab, layout='TN', batch_size=64, buckets=all_pairs, max_sent_len=50)
+                     dataset.targ_vocab, dataset.inv_targ_vocab, layout='TN', batch_size=256, buckets=all_pairs, max_sent_len=50)
 
     valid_iter.bucketize()
     valid_iter_duration = time() - start
