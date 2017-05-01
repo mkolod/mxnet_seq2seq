@@ -222,7 +222,7 @@ def train(args):
 
     fc_weight = mx.sym.Variable('fc_weight')
     fc_bias = mx.sym.Variable('fc_bias')
-    targ_em_weight = mx.sym.Variable('targ_em_weight')
+    targ_em_weight = mx.sym.Variable('targ_embed_weight')
 
     encoder = SequentialRNNCell()
 
@@ -389,7 +389,7 @@ def infer(args):
 
     fc_weight = mx.sym.Variable('fc_weight')
     fc_bias = mx.sym.Variable('fc_bias')
-    targ_em_weight = mx.sym.Variable('targ_em_weight')
+    targ_em_weight = mx.sym.Variable('targ_embed_weight')
 
     if args.use_cudnn_cells:
         encoder = mx.rnn.FusedRNNCell(args.num_hidden, num_layers=args.num_layers, dropout=args.dropout,
@@ -473,11 +473,13 @@ def infer(args):
     if args.load_epoch:
         _, arg_params, aux_params = mx.rnn.load_rnn_checkpoint(
             [encoder, decoder], args.model_prefix, args.load_epoch)
+        print(arg_params)
         model.set_params(arg_params, aux_params)
 
     else:
         arg_params = None
         aux_params = None
+
 
     opt_params = {
       'learning_rate': args.lr,
