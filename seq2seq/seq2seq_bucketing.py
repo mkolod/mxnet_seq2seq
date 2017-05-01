@@ -174,7 +174,10 @@ def get_data(layout):
     return train_iter, valid_iter, train_iter.src_vocab, train_iter.targ_vocab
 
 # WORK IN PROGRESS !!!
-def decoder_unroll(decoder, target_embed, targ_vocab, unroll_length, go_symbol, begin_state=None, layout='TNC', merge_outputs=None):
+def decoder_unroll(decoder, target_embed, targ_vocab, unroll_length,
+                  go_symbol,
+                  fc_weight, fc_bias, targ_em_weight,
+                  begin_state=None, layout='TNC', merge_outputs=None):
 
         decoder.reset()
 
@@ -192,19 +195,19 @@ def decoder_unroll(decoder, target_embed, targ_vocab, unroll_length, go_symbol, 
         # NEW 1
 #        fc_weight = mx.sym.Variable('fc_weight')
 #        fc_bias = mx.sym.Variable('fc_bias')
-#        em_weight = mx.sym.Variable('em_weight')
-#        for i in range(0, unroll_length):
-#            output, states = decoder(embed, states)
-#            outputs.append(embed)
-#            fc = mx.sym.FullyConnected(data=output, weight=fc_weight, bias=fc_bias, num_hidden=len(targ_vocab), name='decoder_fc%d_'%i)
-#            am = mx.sym.argmax(data=fc, axis=1)
-#            embed = mx.sym.Embedding(data=am, weight=em_weight, input_dim=len(targ_vocab),
-#                output_dim=args.num_embed, name='decoder_embed%d_'%i)
+#        targ_em_weight = mx.sym.Variable('targ_em_weight')
+        for i in range(0, unroll_length):
+            output, states = decoder(embed, states)
+            outputs.append(embed)
+            fc = mx.sym.FullyConnected(data=output, weight=fc_weight, bias=fc_bias, num_hidden=len(targ_vocab), name='decoder_fc%d_'%i)
+            am = mx.sym.argmax(data=fc, axis=1)
+            embed = mx.sym.Embedding(data=am, weight=targ_em_weight, input_dim=len(targ_vocab),
+                output_dim=args.num_embed, name='decoder_embed%d_'%i)
 
         # NEW 2
-        for i in range(0, unroll_length):
-            embed, states = decoder(embed, states)
-            outputs.append(embed)
+#        for i in range(0, unroll_length):
+#            embed, states = decoder(embed, states)
+#            outputs.append(embed)
 
         outputs, _ = _normalize_sequence(unroll_length, outputs, layout, merge_outputs)
 
@@ -216,6 +219,10 @@ def train(args):
 
     data_train, data_val, src_vocab, targ_vocab = get_data('TN')
     print "len(src_vocab) len(targ_vocab)", len(src_vocab), len(targ_vocab)
+
+    fc_weight = mx.sym.Variable('fc_weight')
+    fc_bias = mx.sym.Variable('fc_bias')
+    targ_em_weight = mx.sym.Variable('targ_em_weight')
 
     encoder = SequentialRNNCell()
 
@@ -248,7 +255,7 @@ def train(args):
  
         src_embed = mx.sym.Embedding(data=src_data, input_dim=len(src_vocab), 
                                  output_dim=args.num_embed, name='src_embed') 
-        targ_embed = mx.sym.Embedding(data=targ_data, input_dim=len(targ_vocab),    # data=data
+        targ_embed = mx.sym.Embedding(data=targ_data, weight=targ_em_weight, input_dim=len(targ_vocab),    # data=data
                                  output_dim=args.num_embed, name='targ_embed')
 
         encoder.reset()
@@ -262,13 +269,13 @@ def train(args):
         # This should be based on EOS or max seq len for inference, but here we unroll to the target length
         # TODO: fix <GO> symbol
         if args.inference_unrolling_for_training:
-            outputs, _ = decoder_unroll(decoder, targ_embed, targ_vocab, dec_seq_len, 0, begin_state=states, layout='TNC', merge_outputs=True)
+            outputs, _ = decoder_unroll(decoder, targ_embed, targ_vocab, dec_seq_len, 0, fc_weight, fc_bias, targ_em_weight, begin_state=states, layout='TNC', merge_outputs=True)
         else:
             outputs, _ = decoder.unroll(dec_seq_len, targ_embed, begin_state=states, layout=layout, merge_outputs=True)
 
         # NEW
         rs = mx.sym.Reshape(outputs, shape=(-1, args.num_hidden), name='sym_gen_reshape1')
-        fc = mx.sym.FullyConnected(data=rs, num_hidden=len(targ_vocab), name='sym_gen_fc')
+        fc = mx.sym.FullyConnected(data=rs, weight=fc_weight, bias=fc_bias, num_hidden=len(targ_vocab), name='sym_gen_fc')
         label_rs = mx.sym.Reshape(data=label, shape=(-1,), name='sym_gen_reshape2')
         pred = mx.sym.SoftmaxOutput(data=fc, label=label_rs, name='sym_gen_softmax')
 
@@ -292,7 +299,7 @@ def train(args):
 
     if args.load_epoch:
         _, arg_params, aux_params = mx.rnn.load_rnn_checkpoint(
-            cell, args.model_prefix, args.load_epoch)
+            [encoder, decoder], args.model_prefix, args.load_epoch)
     else:
         arg_params = None
         aux_params = None
@@ -322,7 +329,7 @@ def train(args):
         begin_epoch         = args.load_epoch,
         num_epoch           = args.num_epochs,
         batch_end_callback  = mx.callback.Speedometer(batch_size=args.batch_size, frequent=args.disp_batches, auto_reset=True),
-        epoch_end_callback  = mx.rnn.do_rnn_checkpoint(decoder, args.model_prefix, 1)
+        epoch_end_callback  = mx.rnn.do_rnn_checkpoint([encoder, decoder], args.model_prefix, 1)
                               if args.model_prefix else None)
 
     train_duration = time() - start
@@ -380,6 +387,10 @@ def infer(args):
 
     print "len(src_vocab) len(targ_vocab)", len(src_vocab), len(targ_vocab)
 
+    fc_weight = mx.sym.Variable('fc_weight')
+    fc_bias = mx.sym.Variable('fc_bias')
+    targ_em_weight = mx.sym.Variable('targ_em_weight')
+
     if args.use_cudnn_cells:
         encoder = mx.rnn.FusedRNNCell(args.num_hidden, num_layers=args.num_layers, dropout=args.dropout,
             mode='lstm', prefix='lstm_encoder', bidirectional=args.bidirectional, get_next_state=True).unfuse()
@@ -428,14 +439,22 @@ def infer(args):
 
         # This should be based on EOS or max seq len for inference, but here we unroll to the target length
         # TODO: fix <GO> symbol
-        outputs, _ = decoder.unroll(dec_seq_len, targ_embed, begin_state=states, layout=layout, merge_outputs=True)
-#        outputs, _ = decoder_unroll(decoder, targ_embed, targ_vocab, dec_seq_len, 0, begin_state=states, layout='TNC', merge_outputs=True)
+#        outputs, _ = decoder.unroll(dec_seq_len, targ_embed, begin_state=states, layout=layout, merge_outputs=True)
+        outputs, _ = decoder_unroll(decoder, targ_embed, targ_vocab, dec_seq_len, 0, 
+                     fc_weight, fc_bias, targ_em_weight,
+                     begin_state=states, layout='TNC', merge_outputs=True)
 
         # NEW
+
         rs = mx.sym.Reshape(outputs, shape=(-1, args.num_hidden), name='sym_gen_reshape1')
-        fc = mx.sym.FullyConnected(data=rs, num_hidden=len(targ_vocab), name='sym_gen_fc')
+        fc = mx.sym.FullyConnected(data=rs, weight=fc_weight, bias=fc_bias, num_hidden=len(targ_vocab), name='sym_gen_fc')
         label_rs = mx.sym.Reshape(data=label, shape=(-1,), name='sym_gen_reshape2')
         pred = mx.sym.SoftmaxOutput(data=fc, label=label_rs, name='sym_gen_softmax')
+
+#        rs = mx.sym.Reshape(outputs, shape=(-1, args.num_hidden), name='sym_gen_reshape1')
+#        fc = mx.sym.FullyConnected(data=rs, num_hidden=len(targ_vocab), name='sym_gen_fc')
+#        label_rs = mx.sym.Reshape(data=label, shape=(-1,), name='sym_gen_reshape2')
+#        pred = mx.sym.SoftmaxOutput(data=fc, label=label_rs, name='sym_gen_softmax')
 
         return pred, ('src_data', 'targ_data',), ('softmax_label',)
 
@@ -453,7 +472,7 @@ def infer(args):
 
     if args.load_epoch:
         _, arg_params, aux_params = mx.rnn.load_rnn_checkpoint(
-            decoder, args.model_prefix, args.load_epoch)
+            [encoder, decoder], args.model_prefix, args.load_epoch)
         model.set_params(arg_params, aux_params)
 
     else:
