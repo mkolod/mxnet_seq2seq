@@ -425,7 +425,7 @@ def infer(args):
 
     if args.use_cudnn_cells:
         decoder.add(mx.rnn.FusedRNNCell(args.num_hidden, num_layers=args.num_layers,
-            mode='lstm', prefix='lstm_decoder_', bidirectional=False, get_next_state=True)).unfuse()
+            mode='lstm', prefix='lstm_decoder_', bidirectional=False, get_next_state=True).unfuse())
     else:
         for i in range(args.num_layers):
             decoder.add(LSTMCell(args.num_hidden, prefix=('lstm_decoder_l%d_' % i)))
