@@ -198,7 +198,7 @@ def decoder_unroll(decoder, target_embed, targ_vocab, unroll_length,
 #        targ_em_weight = mx.sym.Variable('targ_em_weight')
         for i in range(0, unroll_length):
             output, states = decoder(embed, states)
-            outputs.append(embed)
+            outputs.append(output)
             fc = mx.sym.FullyConnected(data=output, weight=fc_weight, bias=fc_bias, num_hidden=len(targ_vocab), name='decoder_fc%d_'%i)
             am = mx.sym.argmax(data=fc, axis=1)
             embed = mx.sym.Embedding(data=am, weight=targ_em_weight, input_dim=len(targ_vocab),
@@ -495,7 +495,7 @@ def infer(args):
     start = time()
 
     # mx.metric.Perplexity
-    model.score(data_val, BleuScore(invalid_label), #PPL(invalid_label),
+    model.score(data_val, BleuScore(invalid_label), #mx.metric.Perplexity(invalid_label),
                 batch_end_callback=mx.callback.Speedometer(batch_size=args.batch_size, frequent=5, auto_reset=True))
 
     infer_duration = time() - start
