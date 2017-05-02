@@ -295,6 +295,9 @@ class Seq2SeqIter(DataIter):
                     if targ_buck_len == 0 or targ_buck_wid == 0:
                          print("targ_buck_len == 0 or targ_buck_wid == 0")
                          continue
+                    if src_buck_wid != 15 and targ_buck_wid != 16:
+                        print("src_buck_wid = %d, targ_buck_wid = %d, skipping" % (src_buck_wid, targ_buck_wid))
+                        continue
                     self.curr_chunks = self.chunks(range(src_buck_len), self.batch_size)
                     self.switch_bucket = False
 
