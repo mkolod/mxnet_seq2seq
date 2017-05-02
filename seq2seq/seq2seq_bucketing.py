@@ -336,6 +336,14 @@ def train(args):
     time_per_epoch = train_duration / args.num_epochs
     print("\n\nTime per epoch: %.2f seconds\n\n" % time_per_epoch)
 
+
+def drop_sentinels(text_lst):
+    sentinels = lambda x: x == reserved_tokens['<PAD>'] or x == reserved_tokens['<GO>']
+    text_lst = dropwhile(lambda x: sentinels(x), text_lst)
+    text_lst = takewhile(lambda x: not sentinels(x) and x != reserved_tokens['<EOS>'], text_lst)
+    return list(text_lst)
+
+
 class BleuScore(mx.metric.EvalMetric):
     def __init__(self, ignore_label, axis=-1):
         super(BleuScore, self).__init__('BleuScore')
@@ -344,12 +352,6 @@ class BleuScore(mx.metric.EvalMetric):
 
     def update(self, labels, preds):
         assert len(labels) == len(preds)
-
-        def drop_sentinels(text_lst):
-            sentinels = lambda x: x == reserved_tokens['<PAD>'] or x == reserved_tokens['<GO>']
-            text_lst = dropwhile(lambda x: sentinels(x), text_lst)
-            text_lst = takewhile(lambda x: not sentinels(x) and x != reserved_tokens['<EOS>'], text_lst)
-            return list(text_lst)
 
         smoothing_fn = nltk.translate.bleu_score.SmoothingFunction().method3
 
