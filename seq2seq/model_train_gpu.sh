@@ -1,3 +1,5 @@
 #!/bin/bash
-python seq2seq_bucketing.py --num-hidden 512 --num-embed 512 --num-layers 2 --gpus 0 --batch-size 64 --optimizer adagrad --lr 0.1 --disp-batches 1 --num-epochs 1 --dropout 0.5 --model-prefix trained_model
-# --use-cudnn-cells
+python seq2seq_bucketing.py --num-hidden 512 --num-embed 512 --num-layers 2 --gpus 0,1,2,3 --batch-size 256 \
+  --optimizer adagrad --lr 0.1 --disp-batches 1 --num-epochs 10 --model-prefix trained_model --dropout 0.0 
+#  --inference-unrolling-for-training
+# --use-cudnn-cells 

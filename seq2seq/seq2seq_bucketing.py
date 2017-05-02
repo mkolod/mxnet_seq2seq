@@ -3,9 +3,12 @@ import mxnet as mx
 import argparse
 import cPickle as pickle
 #import dill as pickle
+import math
+import nltk
 
 from mxnet.rnn import LSTMCell, SequentialRNNCell, FusedRNNCell
 #from rnn_cell import LSTMCell, SequentialRNNCell
+from itertools import takewhile, dropwhile
 
 from time import time
 import re
@@ -14,8 +17,6 @@ from unidecode import unidecode
 from utils import array_to_text, tokenize_text, invert_dict, get_s2s_data, Dataset
 
 from seq2seq_iterator import *
-
-# from metric import Perplexity
 
 from attention_cell import AttentionEncoderCell, DotAttentionCell
 
@@ -69,11 +70,16 @@ parser.add_argument('--dropout', type=float, default='0.0',
 parser.add_argument('--use-cudnn-cells', action='store_true',
                     help='Use CUDNN LSTM (mx.rnn.FusedRNNCell) for training instead of in-graph LSTM cells (mx.rnn.LSTMCell)')
 
+parser.add_argument('--inference-unrolling-for-training', action='store_true',
+                    help='Feed previous prediction (instead of previous ground truth) into the decoder input during training')
+
 #buckets = [32]
 # buckets = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
 
 start_label = 1
 invalid_label = 0
+
+reserved_tokens={'<PAD>':0, '<UNK>':1, '<EOS>':2, '<GO>':3}
 
 def print_inferred_shapes(node, arg_shapes, aux_shapes, out_shapes):
     args = node.list_arguments()
@@ -165,10 +171,13 @@ def get_data(layout):
 
     print("\nDataset deserialization time: %.2f seconds\n" % duration)
 
-    return train_iter, valid_iter, train_iter.src_vocab, train_iter.targ_vocab
+    return train_iter, valid_iter, train_iter.src_vocab, train_iter.targ_vocab, train_iter.inv_src_vocab, train_iter.inv_targ_vocab
 
 # WORK IN PROGRESS !!!
-def decoder_unroll(decoder, target_embed, targ_vocab, unroll_length, go_symbol, begin_state=None, layout='TNC', merge_outputs=None):
+def decoder_unroll(decoder, target_embed, targ_vocab, unroll_length,
+                  go_symbol,
+                  fc_weight, fc_bias, targ_em_weight,
+                  begin_state=None, layout='TNC', merge_outputs=None):
 
         decoder.reset()
 
@@ -184,21 +193,21 @@ def decoder_unroll(decoder, target_embed, targ_vocab, unroll_length, go_symbol, 
         embed = inputs[0]
 
         # NEW 1
-        # fc_weight = mx.sym.Variable('fc_weight')
-        # fc_bias = mx.sym.Variable('fc_bias')
-        # em_weight = mx.sym.Variable('em_weight')
-        # for i in range(0, unroll_length):
-        #     output, states = decoder(embed, states)
-        #     outputs.append(embed)
-        #     fc = mx.sym.FullyConnected(data=output, weight=fc_weight, bias=fc_bias, num_hidden=len(targ_vocab), name='decoder_fc%d_'%i)
-        #     am = mx.sym.argmax(data=fc, axis=1)
-        #     embed = mx.sym.Embedding(data=am, weight=em_weight, input_dim=len(targ_vocab),
-        #         output_dim=args.num_embed, name='decoder_embed%d_'%i)
+#        fc_weight = mx.sym.Variable('fc_weight')
+#        fc_bias = mx.sym.Variable('fc_bias')
+#        targ_em_weight = mx.sym.Variable('targ_em_weight')
+        for i in range(0, unroll_length):
+            output, states = decoder(embed, states)
+            outputs.append(output)
+            fc = mx.sym.FullyConnected(data=output, weight=fc_weight, bias=fc_bias, num_hidden=len(targ_vocab), name='decoder_fc%d_'%i)
+            am = mx.sym.argmax(data=fc, axis=1)
+            embed = mx.sym.Embedding(data=am, weight=targ_em_weight, input_dim=len(targ_vocab),
+                output_dim=args.num_embed, name='decoder_embed%d_'%i)
 
         # NEW 2
-        for i in range(0, unroll_length):
-            embed, states = decoder(embed, states)
-            outputs.append(embed)
+#        for i in range(0, unroll_length):
+#            embed, states = decoder(embed, states)
+#            outputs.append(embed)
 
         outputs, _ = _normalize_sequence(unroll_length, outputs, layout, merge_outputs)
 
@@ -208,8 +217,12 @@ def train(args):
 
     from time import time
 
-    data_train, data_val, src_vocab, targ_vocab = get_data('TN')
+    data_train, data_val, src_vocab, targ_vocab, inv_src_vocab, inv_targ_vocab = get_data('TN')
     print "len(src_vocab) len(targ_vocab)", len(src_vocab), len(targ_vocab)
+
+    fc_weight = mx.sym.Variable('fc_weight')
+    fc_bias = mx.sym.Variable('fc_bias')
+    targ_em_weight = mx.sym.Variable('targ_embed_weight')
 
     encoder = SequentialRNNCell()
 
@@ -249,7 +262,7 @@ def train(args):
 
         src_embed = mx.sym.Embedding(data=src_data, input_dim=len(src_vocab),
                                  output_dim=args.num_embed, name='src_embed')
-        targ_embed = mx.sym.Embedding(data=targ_data, input_dim=len(targ_vocab),    # data=data
+        targ_embed = mx.sym.Embedding(data=targ_data, weight=targ_em_weight, input_dim=len(targ_vocab),    # data=data
                                  output_dim=args.num_embed, name='targ_embed')
 
         encoder.reset()
@@ -262,12 +275,14 @@ def train(args):
 
         # This should be based on EOS or max seq len for inference, but here we unroll to the target length
         # TODO: fix <GO> symbol
-        outputs, _ = decoder.unroll(dec_seq_len, targ_embed, begin_state=states, layout=layout, merge_outputs=True)
-#        outputs, _ = decoder_unroll(decoder, targ_embed, targ_vocab, dec_seq_len, 0, begin_state=states, layout='TNC', merge_outputs=True)
+        if args.inference_unrolling_for_training:
+            outputs, _ = decoder_unroll(decoder, targ_embed, targ_vocab, dec_seq_len, 0, fc_weight, fc_bias, targ_em_weight, begin_state=states, layout='TNC', merge_outputs=True)
+        else:
+            outputs, _ = decoder.unroll(dec_seq_len, targ_embed, begin_state=states, layout=layout, merge_outputs=True)
 
         # NEW
         rs = mx.sym.Reshape(outputs, shape=(-1, args.num_hidden), name='sym_gen_reshape1')
-        fc = mx.sym.FullyConnected(data=rs, num_hidden=len(targ_vocab), name='sym_gen_fc')
+        fc = mx.sym.FullyConnected(data=rs, weight=fc_weight, bias=fc_bias, num_hidden=len(targ_vocab), name='sym_gen_fc')
         label_rs = mx.sym.Reshape(data=label, shape=(-1,), name='sym_gen_reshape2')
         pred = mx.sym.SoftmaxOutput(data=fc, label=label_rs, name='sym_gen_softmax')
 
@@ -291,7 +306,7 @@ def train(args):
 
     if args.load_epoch:
         _, arg_params, aux_params = mx.rnn.load_rnn_checkpoint(
-            cell, args.model_prefix, args.load_epoch)
+            [encoder, decoder], args.model_prefix, args.load_epoch)
     else:
         arg_params = None
         aux_params = None
@@ -321,21 +336,71 @@ def train(args):
         begin_epoch         = args.load_epoch,
         num_epoch           = args.num_epochs,
         batch_end_callback  = mx.callback.Speedometer(batch_size=args.batch_size, frequent=args.disp_batches, auto_reset=True),
-        epoch_end_callback  = mx.rnn.do_rnn_checkpoint(decoder, args.model_prefix, 1)
+        epoch_end_callback  = mx.rnn.do_rnn_checkpoint([encoder, decoder], args.model_prefix, 1)
                               if args.model_prefix else None)
 
     train_duration = time() - start
     time_per_epoch = train_duration / args.num_epochs
     print("\n\nTime per epoch: %.2f seconds\n\n" % time_per_epoch)
 
+
+def drop_sentinels(text_lst):
+    sentinels = lambda x: x == reserved_tokens['<PAD>'] or x == reserved_tokens['<GO>']
+    text_lst = dropwhile(lambda x: sentinels(x), text_lst)
+    text_lst = takewhile(lambda x: not sentinels(x) and x != reserved_tokens['<EOS>'], text_lst)
+    return list(text_lst)
+
+
+class BleuScore(mx.metric.EvalMetric):
+    def __init__(self, ignore_label, axis=-1):
+        super(BleuScore, self).__init__('BleuScore')
+        self.ignore_label = ignore_label
+        self.axis = axis
+
+    def update(self, labels, preds):
+        assert len(labels) == len(preds)
+
+        smoothing_fn = nltk.translate.bleu_score.SmoothingFunction().method3
+
+        for label, pred in zip(labels, preds):
+            maxed = mx.ndarray.argmax(data=pred, axis=1)
+            pred_nparr = maxed.asnumpy()
+            label_nparr = label.asnumpy().astype(np.int32)
+            sent_len, batch_size = np.shape(label_nparr)
+            pred_nparr = pred_nparr.reshape(sent_len, batch_size).astype(np.int32)
+
+            for i in range(batch_size):
+                exp_lst = drop_sentinels(label_nparr[:, i].tolist())
+                act_lst = drop_sentinels(pred_nparr[:, i].tolist())
+                expected = exp_lst
+                actual = act_lst
+                bleu = nltk.translate.bleu_score.sentence_bleu(
+                    references=[expected], hypothesis=actual, weights=(0.25, 0.25, 0.25, 0.25),
+                    smoothing_function = smoothing_fn
+                )
+#                print("bleu: %f" % bleu)
+                self.sum_metric += bleu
+                self.num_inst += 1
+            assert label.size == pred.size/pred.shape[-1], \
+                "shape mismatch: %s vs. %s"%(label.shape, pred.shape)
+
+    def get(self):
+        num = self.num_inst if self.num_inst > 0 else float('nan')
+        return (self.name, self.sum_metric/num)
+
+
 def infer(args):
     assert args.model_prefix, "Must specifiy path to load from"
 
-    data_train, data_val, src_vocab, targ_vocab = get_data('TN')
+    data_train, data_val, src_vocab, targ_vocab, inv_src_vocab, inv_targ_vocab = get_data('TN')
 
     print "len(src_vocab) len(targ_vocab)", len(src_vocab), len(targ_vocab)
 
     encoder = SequentialRNNCell()
+    fc_weight = mx.sym.Variable('fc_weight')
+    fc_bias = mx.sym.Variable('fc_bias')
+    targ_em_weight = mx.sym.Variable('targ_embed_weight')
+
     if args.use_cudnn_cells:
         encoder.add(mx.rnn.FusedRNNCell(args.num_hidden, num_layers=args.num_layers, dropout=args.dropout,
             mode='lstm', prefix='lstm_encoder_', bidirectional=args.bidirectional,
@@ -375,7 +440,8 @@ def infer(args):
 
         src_embed = mx.sym.Embedding(data=src_data, input_dim=len(src_vocab),
                                  output_dim=args.num_embed, name='src_embed')
-        targ_embed = mx.sym.Embedding(data=targ_data, input_dim=len(targ_vocab),    # data=data
+        targ_embed = mx.sym.Embedding(data=targ_data, input_dim=len(targ_vocab),
+                                 weight = targ_em_weight,    # data=data
                                  output_dim=args.num_embed, name='targ_embed')
 
         encoder.reset()
@@ -389,13 +455,21 @@ def infer(args):
         # This should be based on EOS or max seq len for inference, but here we unroll to the target length
         # TODO: fix <GO> symbol
 #        outputs, _ = decoder.unroll(dec_seq_len, targ_embed, begin_state=states, layout=layout, merge_outputs=True)
-        outputs, _ = decoder_unroll(decoder, targ_embed, targ_vocab, dec_seq_len, 0, begin_state=states, layout='TNC', merge_outputs=True)
+        outputs, _ = decoder_unroll(decoder, targ_embed, targ_vocab, dec_seq_len, 0,
+                     fc_weight, fc_bias, targ_em_weight,
+                     begin_state=states, layout='TNC', merge_outputs=True)
 
         # NEW
+
         rs = mx.sym.Reshape(outputs, shape=(-1, args.num_hidden), name='sym_gen_reshape1')
-        fc = mx.sym.FullyConnected(data=rs, num_hidden=len(targ_vocab), name='sym_gen_fc')
+        fc = mx.sym.FullyConnected(data=rs, weight=fc_weight, bias=fc_bias, num_hidden=len(targ_vocab), name='sym_gen_fc')
         label_rs = mx.sym.Reshape(data=label, shape=(-1,), name='sym_gen_reshape2')
         pred = mx.sym.SoftmaxOutput(data=fc, label=label_rs, name='sym_gen_softmax')
+
+#        rs = mx.sym.Reshape(outputs, shape=(-1, args.num_hidden), name='sym_gen_reshape1')
+#        fc = mx.sym.FullyConnected(data=rs, num_hidden=len(targ_vocab), name='sym_gen_fc')
+#        label_rs = mx.sym.Reshape(data=label, shape=(-1,), name='sym_gen_reshape2')
+#        pred = mx.sym.SoftmaxOutput(data=fc, label=label_rs, name='sym_gen_softmax')
 
         return pred, ('src_data', 'targ_data',), ('softmax_label',)
 
@@ -413,12 +487,14 @@ def infer(args):
 
     if args.load_epoch:
         _, arg_params, aux_params = mx.rnn.load_rnn_checkpoint(
-            decoder, args.model_prefix, args.load_epoch)
+            [encoder, decoder], args.model_prefix, args.load_epoch)
+#        print(arg_params)
         model.set_params(arg_params, aux_params)
 
     else:
         arg_params = None
         aux_params = None
+
 
     opt_params = {
       'learning_rate': args.lr,
@@ -432,8 +508,47 @@ def infer(args):
 
     start = time()
 
-    model.score(data_val, mx.metric.Perplexity(invalid_label),
-                batch_end_callback=mx.callback.Speedometer(batch_size=args.batch_size, frequent=5, auto_reset=True))
+    # mx.metric.Perplexity
+#    model.score(data_val, BleuScore(invalid_label), #mx.metric.Perplexity(invalid_label),
+#                batch_end_callback=mx.callback.Speedometer(batch_size=args.batch_size, frequent=5, auto_reset=True))
+
+    for bkt in range(10):
+        data_val.reset()
+        data_batch = data_val.next()
+
+        model.forward(data_batch, is_train=None)
+        source = data_batch.data[0]
+        preds = model.get_outputs()[0]
+        labels = data_batch.label[0]
+
+        maxed = mx.ndarray.argmax(data=preds, axis=1)
+        pred_nparr = maxed.asnumpy()
+        src_nparr = source.asnumpy()
+        label_nparr = labels.asnumpy().astype(np.int32)
+        sent_len, batch_size = np.shape(label_nparr)
+        pred_nparr = pred_nparr.reshape(sent_len, batch_size).astype(np.int32)
+
+
+        # range should be number of examples in the bucket
+        for i in range(10):
+            src_lst = list(reversed(drop_sentinels(src_nparr[:, i].tolist())))
+            exp_lst = drop_sentinels(label_nparr[:, i].tolist())
+            act_lst = drop_sentinels(pred_nparr[:, i].tolist())
+
+            # convert source to text
+            src_txt = array_to_text(src_lst, inv_src_vocab)
+
+            # convert expected translation to text
+            exp_txt = array_to_text(exp_lst, inv_targ_vocab)
+
+            # convert actual translation to text
+            act_txt = array_to_text(act_lst, inv_targ_vocab)
+
+            print("\n")
+            print("Source text: %s" % src_txt)
+            print("Expected translation: %s" % exp_txt)
+            print("Actual translation: %s" % act_txt)
+
 
     infer_duration = time() - start
     time_per_epoch = infer_duration / args.num_epochs
@@ -450,6 +565,7 @@ if __name__ == '__main__':
     else:
         contexts = mx.cpu(0)
 
+    print("\n")
 
     if args.num_layers >= 4 and len(args.gpus.split(',')) >= 4 and not args.stack_rnn:
         print('WARNING: stack-rnn is recommended to train complex model on multiple GPUs')
@@ -459,4 +575,8 @@ if __name__ == '__main__':
         # with non-fused MXNet symbol
         infer(args)
     else:
+        if args.inference_unrolling_for_training:
+            print("INFO: Using inference decoder unrolling for training")
+        else:
+            print("INFO: Using regular decoder unrolling for training")
         train(args)
