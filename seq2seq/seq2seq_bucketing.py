@@ -495,8 +495,46 @@ def infer(args):
     start = time()
 
     # mx.metric.Perplexity
-    model.score(data_val, BleuScore(invalid_label), #mx.metric.Perplexity(invalid_label),
-                batch_end_callback=mx.callback.Speedometer(batch_size=args.batch_size, frequent=5, auto_reset=True))
+#    model.score(data_val, BleuScore(invalid_label), #mx.metric.Perplexity(invalid_label),
+#                batch_end_callback=mx.callback.Speedometer(batch_size=args.batch_size, frequent=5, auto_reset=True))
+
+    for bkt in range(10):
+        data_val.reset()
+        data_batch = data_val.next()
+
+        model.forward(data_batch, is_train=None)
+        source = data_batch.data[0]
+        preds = model.get_outputs()[0]
+        labels = data_batch.label[0]
+
+        maxed = mx.ndarray.argmax(data=preds, axis=1)
+        pred_nparr = maxed.asnumpy()
+        src_nparr = source.asnumpy()
+        label_nparr = labels.asnumpy().astype(np.int32)
+        sent_len, batch_size = np.shape(label_nparr)
+        pred_nparr = pred_nparr.reshape(sent_len, batch_size).astype(np.int32)
+
+
+        # range should be number of examples in the bucket 
+        for i in range(10):
+            src_lst = list(reversed(drop_sentinels(src_nparr[:, i].tolist())))
+            exp_lst = drop_sentinels(label_nparr[:, i].tolist())
+            act_lst = drop_sentinels(pred_nparr[:, i].tolist())
+
+            # convert source to text
+            src_txt = array_to_text(src_lst, inv_src_vocab)
+
+            # convert expected translation to text
+            exp_txt = array_to_text(exp_lst, inv_targ_vocab)
+
+            # convert actual translation to text
+            act_txt = array_to_text(act_lst, inv_targ_vocab)
+
+            print("\n")
+            print("Source text: %s" % src_txt)
+            print("Expected translation: %s" % exp_txt)
+            print("Actual translation: %s" % act_txt)
+
 
     infer_duration = time() - start
     time_per_epoch = infer_duration / args.num_epochs
