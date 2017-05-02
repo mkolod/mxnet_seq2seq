@@ -171,7 +171,7 @@ def get_data(layout):
 
     print("\nDataset deserialization time: %.2f seconds\n" % duration)
 
-    return train_iter, valid_iter, train_iter.src_vocab, train_iter.targ_vocab
+    return train_iter, valid_iter, train_iter.src_vocab, train_iter.targ_vocab, train_iter.inv_src_vocab, train_iter.inv_targ_vocab
 
 # WORK IN PROGRESS !!!
 def decoder_unroll(decoder, target_embed, targ_vocab, unroll_length,
@@ -217,7 +217,7 @@ def train(args):
 
     from time import time
 
-    data_train, data_val, src_vocab, targ_vocab = get_data('TN')
+    data_train, data_val, src_vocab, targ_vocab, inv_src_vocab, inv_targ_vocab = get_data('TN')
     print "len(src_vocab) len(targ_vocab)", len(src_vocab), len(targ_vocab)
 
     fc_weight = mx.sym.Variable('fc_weight')
@@ -385,7 +385,7 @@ class BleuScore(mx.metric.EvalMetric):
 def infer(args):
     assert args.model_prefix, "Must specifiy path to load from"
 
-    data_train, data_val, src_vocab, targ_vocab = get_data('TN')
+    data_train, data_val, src_vocab, targ_vocab, inv_src_vocab, inv_targ_vocab = get_data('TN')
 
     print "len(src_vocab) len(targ_vocab)", len(src_vocab), len(targ_vocab)
 
