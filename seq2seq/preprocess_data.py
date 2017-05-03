@@ -28,10 +28,12 @@ if __name__ == '__main__':
     start = time()
 
     dataset = get_s2s_data(
-        src_train_path= './data/wmt15-de-en/train.en',
-        src_valid_path= './data/wmt15-de-en/valid.en',
-        targ_train_path= './data/wmt15-de-en/train.de',
-        targ_valid_path= './data/wmt15-de-en/valid.de' 
+        src_train_path= './data/wmt15-de-en/train.de',
+        src_valid_path= './data/wmt15-de-en/valid.de',
+        src_test_path = './data/wmt15-de-en/test.de',
+        targ_train_path= './data/wmt15-de-en/train.en',
+        targ_valid_path= './data/wmt15-de-en/valid.en',
+        targ_test_path= './data/wmt15-de-en/test.en',
     )
 
 #    dataset = get_s2s_data(
@@ -59,11 +61,12 @@ if __name__ == '__main__':
 #    all_pairs = [(5, 5), (15,15), (20, 20)]
 #    max_sent_len = 25
 
+    batch_size=64
 
     print("Constructing train iterator")
     start = time()
     train_iter = Seq2SeqIter(dataset.src_train_sent, dataset.targ_train_sent, dataset.src_vocab, dataset.inv_src_vocab,
-                     dataset.targ_vocab, dataset.inv_targ_vocab, layout='TN', batch_size=64, buckets=all_pairs, max_sent_len=max_len)
+                     dataset.targ_vocab, dataset.inv_targ_vocab, layout='TN', batch_size=batch_size, buckets=all_pairs, max_sent_len=max_len)
 
     train_iter.bucketize()
     train_iter_duration = time() - start
@@ -80,7 +83,7 @@ if __name__ == '__main__':
     print("Constructing valid iterator")
     valid_iter_duration = time()
     valid_iter = Seq2SeqIter(dataset.src_valid_sent, dataset.targ_valid_sent, dataset.src_vocab, dataset.inv_src_vocab,
-                     dataset.targ_vocab, dataset.inv_targ_vocab, layout='TN', batch_size=64, buckets=all_pairs, max_sent_len=50)
+                     dataset.targ_vocab, dataset.inv_targ_vocab, layout='TN', batch_size=batch_size, buckets=all_pairs, max_sent_len=max_len)
 
     valid_iter.bucketize()
     valid_iter_duration = time() - start
@@ -92,4 +95,20 @@ if __name__ == '__main__':
         pickle.dump(train_iter, f, pickle.HIGHEST_PROTOCOL)
     valid_ser_duration = time() - start
     print("\nSerializing validation set iterator took %.4f seconds\n" % valid_ser_duration)
+
+    print("Constructing test iterator")
+    test_iter_duration = time()
+    test_iter = Seq2SeqIter(dataset.src_test_sent, dataset.targ_test_sent, dataset.src_vocab, dataset.inv_src_vocab,
+                     dataset.targ_vocab, dataset.inv_targ_vocab, layout='TN', batch_size=batch_size, buckets=all_pairs, max_sent_len=max_len)
+
+    test_iter.bucketize()
+    test_iter_duration = time() - start
+    print("\nBucketizing data for test set iterator took %.4f seconds\n" % test_iter_duration)
+
+    print("Serializing test set iterator.")
+    start = time()
+    with open('./data/test_iterator.pkl', 'wb') as f:
+        pickle.dump(test_iter, f, pickle.HIGHEST_PROTOCOL)
+    test_ser_duration = time() - start
+    print("\nSerializing test set iterator took %.4f seconds\n" % test_ser_duration)
 

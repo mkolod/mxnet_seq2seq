@@ -15,8 +15,8 @@ Dicts = namedtuple(
 
 Dataset = namedtuple(
     'Dataset',
-    ['src_train_sent', 'src_valid_sent', 'src_vocab', 'inv_src_vocab', 
-     'targ_train_sent', 'targ_valid_sent', 'targ_vocab', 'inv_targ_vocab'])
+    ['src_train_sent', 'src_valid_sent', 'src_test_sent', 'src_vocab', 'inv_src_vocab', 
+     'targ_train_sent', 'targ_valid_sent', 'targ_test_sent', 'targ_vocab', 'inv_targ_vocab'])
 
 def invert_dict(d):
     return {v: k for k, v in d.iteritems()}
@@ -91,7 +91,8 @@ def array_to_text(array, inv_vocab):
         sent.append(inv_vocab[token])
     return " ".join(sent)
 
-def get_s2s_data(src_train_path, src_valid_path, targ_train_path, targ_valid_path,
+def get_s2s_data(src_train_path, src_valid_path, targ_train_path,
+    targ_valid_path, src_test_path, targ_test_path,
     reserved_tokens=['<UNK>', '<PAD>', '<EOS>', '<GO>']):
 
     print("Creating joint source dictionary")
@@ -99,8 +100,10 @@ def get_s2s_data(src_train_path, src_valid_path, targ_train_path, targ_valid_pat
        
     print("Tokenizing src_train_path") 
     src_train_sent = tokenize_text(src_train_path, vocab=src_dict)
-    print("Tokenizing targ_train_path")
+    print("Tokenizing src_valid_path")
     src_valid_sent = tokenize_text(src_valid_path, vocab=src_dict)
+    print("Tokenizing src_test_path")
+    src_test_sent = tokenize_text(src_test_path, vocab=src_dict)
 
     print("Creating joint target dictionary")
     targ_dict, inv_targ_dict = top_words_train_valid(targ_train_path, targ_valid_path)
@@ -109,6 +112,8 @@ def get_s2s_data(src_train_path, src_valid_path, targ_train_path, targ_valid_pat
     targ_train_sent = tokenize_text(targ_train_path, vocab=targ_dict)
     print("Tokenizing targ_valid_path")
     targ_valid_sent = tokenize_text(targ_valid_path, vocab=targ_dict)
+    print("Tokenizing targ_test_path")
+    targ_test_sent = tokenize_text(targ_test_path, vocab=targ_dict)
 
     print("\nEncoded source language sentences:\n")
     for i in range(5):
@@ -120,6 +125,7 @@ def get_s2s_data(src_train_path, src_valid_path, targ_train_path, targ_valid_pat
 
 
     return Dataset(
-        src_train_sent=src_train_sent, src_valid_sent=src_valid_sent, src_vocab=src_dict, inv_src_vocab=inv_src_dict,
-        targ_train_sent=targ_train_sent, targ_valid_sent=targ_valid_sent, targ_vocab=targ_dict, inv_targ_vocab=inv_targ_dict)
+        src_train_sent=src_train_sent, src_valid_sent=src_valid_sent, src_test_sent=src_test_sent,
+        src_vocab=src_dict, inv_src_vocab=inv_src_dict, targ_train_sent=targ_train_sent,
+        targ_valid_sent=targ_valid_sent, targ_test_sent=targ_test_sent, targ_vocab=targ_dict, inv_targ_vocab=inv_targ_dict)
 
