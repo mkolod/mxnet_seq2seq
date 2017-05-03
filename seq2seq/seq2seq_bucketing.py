@@ -159,6 +159,12 @@ def get_data(layout):
     valid_iter.initialize()
     valid_iter.batch_size = args.batch_size
 
+    with open('./data/test_iterator.pkl', 'rb') as f:
+        test_iter = pickle.load(f)
+
+    test_iter.initialize()
+    test_iter.batch_size = args.batch_size
+
     print("\nEncoded source language sentences:\n")
     for i in range(5):
         print(array_to_text(train_iter.src_sent[i], train_iter.inv_src_vocab))
@@ -171,7 +177,7 @@ def get_data(layout):
 
     print("\nDataset deserialization time: %.2f seconds\n" % duration)
 
-    return train_iter, valid_iter, train_iter.src_vocab, train_iter.targ_vocab, train_iter.inv_src_vocab, train_iter.inv_targ_vocab
+    return train_iter, valid_iter, test_iter, train_iter.src_vocab, train_iter.targ_vocab, train_iter.inv_src_vocab, train_iter.inv_targ_vocab
 
 # WORK IN PROGRESS !!!
 def decoder_unroll(decoder, target_embed, targ_vocab, unroll_length,
@@ -217,7 +223,7 @@ def train(args):
 
     from time import time
 
-    data_train, data_val, src_vocab, targ_vocab, inv_src_vocab, inv_targ_vocab = get_data('TN')
+    data_train, data_val, _, src_vocab, targ_vocab, inv_src_vocab, inv_targ_vocab = get_data('TN')
     print "len(src_vocab) len(targ_vocab)", len(src_vocab), len(targ_vocab)
 
     fc_weight = mx.sym.Variable('fc_weight')
@@ -385,7 +391,7 @@ class BleuScore(mx.metric.EvalMetric):
 def infer(args):
     assert args.model_prefix, "Must specifiy path to load from"
 
-    data_train, data_val, src_vocab, targ_vocab, inv_src_vocab, inv_targ_vocab = get_data('TN')
+    _, _, data_test, src_vocab, targ_vocab, inv_src_vocab, inv_targ_vocab = get_data('TN')
 
     print "len(src_vocab) len(targ_vocab)", len(src_vocab), len(targ_vocab)
 
@@ -471,7 +477,7 @@ def infer(args):
         default_bucket_key  = data_train.default_bucket_key,
         context             = contexts)
 
-    model.bind(data_val.provide_data, data_val.provide_label, for_training=False)
+    model.bind(data_test.provide_data, data_test.provide_label, for_training=False)
 
     if args.load_epoch:
         _, arg_params, aux_params = mx.rnn.load_rnn_checkpoint(
@@ -497,8 +503,8 @@ def infer(args):
     start = time()
 
     # mx.metric.Perplexity
-    model.score(data_val, BleuScore(invalid_label), #mx.metric.Perplexity(invalid_label),
-                batch_end_callback=mx.callback.Speedometer(batch_size=args.batch_size, frequent=5, auto_reset=True))
+    model.score(data_test, BleuScore(invalid_label), #mx.metric.Perplexity(invalid_label),
+                batch_end_callback=mx.callback.Speedometer(batch_size=args.batch_size, frequent=1, auto_reset=True))
 
     for bkt in range(10):
         data_val.reset()
