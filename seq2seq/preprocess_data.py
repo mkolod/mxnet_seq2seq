@@ -28,12 +28,12 @@ if __name__ == '__main__':
     start = time()
 
     dataset = get_s2s_data(
-        src_train_path=  './data/train.de',
-        src_valid_path=  './data/valid.de',
-        src_test_path = './data/test.de',
-        targ_train_path= './data/train.en',
-        targ_valid_path= './data/valid.en',
-        targ_test_path = './data/test.en'
+        src_train_path=  './data/wmt15-de-en/train.de',
+        src_valid_path=  './data/wmt15-de-en/valid.de',
+        src_test_path = './data/wmt15-de-en/test.de',
+        targ_train_path= './data/wmt15-de-en/train.en',
+        targ_valid_path= './data/wmt15-de-en/valid.en',
+        targ_test_path = './data/wmt15-de-en/test.en'
     )
 
    
