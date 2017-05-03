@@ -497,8 +497,8 @@ def infer(args):
     start = time()
 
     # mx.metric.Perplexity
-#    model.score(data_val, BleuScore(invalid_label), #mx.metric.Perplexity(invalid_label),
-#                batch_end_callback=mx.callback.Speedometer(batch_size=args.batch_size, frequent=5, auto_reset=True))
+    model.score(data_val, BleuScore(invalid_label), #mx.metric.Perplexity(invalid_label),
+                batch_end_callback=mx.callback.Speedometer(batch_size=args.batch_size, frequent=5, auto_reset=True))
 
     for bkt in range(10):
         data_val.reset()
