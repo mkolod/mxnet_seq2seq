@@ -28,12 +28,12 @@ if __name__ == '__main__':
     start = time()
 
     dataset = get_s2s_data(
-        src_train_path=  './data/europarl-v7.es-en.en_train_small',
-        src_valid_path=  './data/europarl-v7.es-en.en_valid_small',
-        src_test_path = './data/europarl-v7.es-en.en_test_small',
-        targ_train_path= './data/europarl-v7.es-en.es_train_small',
-        targ_valid_path= './data/europarl-v7.es-en.en_valid_small',
-        targ_test_path = './data/europarl-v7.es-en.es_test_small'
+        src_train_path=  './data/train.de',
+        src_valid_path=  './data/valid.de',
+        src_test_path = './data/test.de',
+        targ_train_path= './data/train.en',
+        targ_valid_path= './data/valid.en',
+        targ_test_path = './data/test.en'
     )
 
    
