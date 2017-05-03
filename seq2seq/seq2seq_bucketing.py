@@ -474,7 +474,7 @@ def infer(args):
 
     model = mx.mod.BucketingModule( 
         sym_gen             = sym_gen,
-        default_bucket_key  = data_train.default_bucket_key,
+        default_bucket_key  = data_test.default_bucket_key,
         context             = contexts)
 
     model.bind(data_test.provide_data, data_test.provide_label, for_training=False)
@@ -505,10 +505,10 @@ def infer(args):
     # mx.metric.Perplexity
     model.score(data_test, BleuScore(invalid_label), #mx.metric.Perplexity(invalid_label),
                 batch_end_callback=mx.callback.Speedometer(batch_size=args.batch_size, frequent=1, auto_reset=True))
-
-    for bkt in range(10):
-        data_val.reset()
-        data_batch = data_val.next()
+    # 10
+    for bkt in range(0):
+        data_test.reset()
+        data_batch = data_test.next()
 
         model.forward(data_batch, is_train=None)
         source = data_batch.data[0]
