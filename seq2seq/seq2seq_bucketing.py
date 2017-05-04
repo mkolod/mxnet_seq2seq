@@ -72,6 +72,8 @@ parser.add_argument('--use-cudnn-cells', action='store_true',
 
 parser.add_argument('--inference-unrolling-for-training', action='store_true',
                     help='Feed previous prediction (instead of previous ground truth) into the decoder input during training')
+parser.add_argument('--seed', type=int, default=1234,
+                    help='Set random seed for Python, NumPy and MxNet RNGs')
 
 #buckets = [32]
 # buckets = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
@@ -551,6 +553,15 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG, format=head)
 
     args = parser.parse_args()
+
+    # set random seeds for Python, NumPy and MxNet
+    import random
+    seed = args.seed
+    np.random.seed(seed)
+    random.seed(seed)
+    mx.random.seed(seed)
+    print("Using seed: %d" % seed)
+
     if args.gpus:
         contexts = [mx.gpu(int(i)) for i in args.gpus.split(',')]
     else:
