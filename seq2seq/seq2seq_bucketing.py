@@ -171,7 +171,7 @@ def get_data(layout):
 
     print("\nEncoded target language sentences:\n")
     for i in range(5):
-        print(array_to_text(valid_iter.targ_sent[i], train_iter.inv_targ_vocab))
+        print(array_to_text(train_iter.targ_sent[i], train_iter.inv_targ_vocab))
     
     duration = time() - start
 
@@ -506,7 +506,7 @@ def infer(args):
     model.score(data_test, BleuScore(invalid_label), #mx.metric.Perplexity(invalid_label),
                 batch_end_callback=mx.callback.Speedometer(batch_size=args.batch_size, frequent=1, auto_reset=True))
     # 10
-    for bkt in range(0):
+    for bkt in range(10):
         data_test.reset()
         data_batch = data_test.next()
 
