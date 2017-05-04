@@ -105,16 +105,17 @@ class Seq2SeqIter(DataIter):
     def initialize(self, curr_batch_size=None):
         if curr_batch_size:
             self.batch_size = curr_batch_size
+            self.default_bucket_key = (self.default_bucket_key[0]+1, self.default_bucket_key[1]+1)
         if self.layout == 'TN':
             self.provide_data = [
                 mx.io.DataDesc(self.src_data_name, (self.default_bucket_key[0], self.batch_size), layout='TN'),
-                mx.io.DataDesc(self.targ_data_name, (self.default_bucket_key[0], self.batch_size), layout='TN')
+                mx.io.DataDesc(self.targ_data_name, (self.default_bucket_key[1], self.batch_size), layout='TN')
             ]
             self.provide_label = [mx.io.DataDesc(self.label_name, (self.default_bucket_key[1], self.batch_size), layout='TN')]
         elif self.layout == 'NT':
             self.provide_data = [
                 (self.src_data_name, (self.batch_size, self.default_bucket_key[0])),
-                (self.targ_data_name, (self.batch_size, self.default_bucket_key[0]))]
+                (self.targ_data_name, (self.batch_size, self.default_bucket_key[1]))]
             self.provide_label = [(self.label_name, (self.batch_size, self.default_bucket_key[1]))]
         else:
             raise ValueError("Invalid layout %s: Must by NT (batch major) or TN (time major)")
