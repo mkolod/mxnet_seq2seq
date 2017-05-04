@@ -148,22 +148,19 @@ def get_data(layout):
     with open('./data/train_iterator.pkl', 'rb') as f: # _en_de.pkl
         train_iter = pickle.load(f)
  
-    train_iter.initialize()
-    train_iter.batch_size = args.batch_size
+    train_iter.initialize(curr_batch_size=args.batch_size)
 
     print("\nUnpickling validation iterator")
 
     with open('./data/valid_iterator.pkl', 'rb') as f: # _en_de.pkl
         valid_iter = pickle.load(f)
  
-    valid_iter.initialize()
-    valid_iter.batch_size = args.batch_size
+    valid_iter.initialize(curr_batch_size=args.batch_size)
 
     with open('./data/test_iterator.pkl', 'rb') as f:
         test_iter = pickle.load(f)
 
-    test_iter.initialize()
-    test_iter.batch_size = args.batch_size
+    test_iter.initialize(curr_batch_size=args.batch_size)
 
     print("\nEncoded source language sentences:\n")
     for i in range(5):
