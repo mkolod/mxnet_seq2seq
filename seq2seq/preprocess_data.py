@@ -85,7 +85,7 @@ if __name__ == '__main__':
     print("Serializing validation set iterator.")
     start = time()
     with open('./data/valid_iterator.pkl', 'wb') as f:
-        pickle.dump(train_iter, f, pickle.HIGHEST_PROTOCOL)
+        pickle.dump(valid_iter, f, pickle.HIGHEST_PROTOCOL)
     valid_ser_duration = time() - start
     print("\nSerializing validation set iterator took %.4f seconds\n" % valid_ser_duration)
 
