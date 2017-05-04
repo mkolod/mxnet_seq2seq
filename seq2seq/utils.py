@@ -91,8 +91,8 @@ def array_to_text(array, inv_vocab):
         sent.append(inv_vocab[token])
     return " ".join(sent)
 
-def get_s2s_data(src_train_path, src_valid_path, targ_train_path,
-    targ_valid_path, src_test_path, targ_test_path,
+def get_s2s_data(src_train_path, src_valid_path, src_test_path, targ_train_path,
+    targ_valid_path, targ_test_path,
     reserved_tokens=['<UNK>', '<PAD>', '<EOS>', '<GO>']):
 
     print("Creating joint source dictionary")
