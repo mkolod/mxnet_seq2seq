@@ -141,42 +141,46 @@ def _normalize_sequence(length, inputs, layout, merge, in_layout=None):
 
     return inputs, axis
 
-def get_data(layout):
+def get_data(layout, infer=False):
 
     start = time()
 
     print("\nUnpickling training iterator")
 
-    with open('./data/train_iterator.pkl', 'rb') as f: # _en_de.pkl
-        train_iter = pickle.load(f)
+    if not infer:
+        with open('./data/train_iterator.pkl', 'rb') as f: # _en_de.pkl
+            train_iter = pickle.load(f)
  
-    train_iter.initialize(curr_batch_size=args.batch_size)
+        train_iter.initialize(curr_batch_size=args.batch_size)
 
-    print("\nUnpickling validation iterator")
+        print("\nUnpickling validation iterator")
 
-    with open('./data/valid_iterator.pkl', 'rb') as f: # _en_de.pkl
-        valid_iter = pickle.load(f)
+        with open('./data/valid_iterator.pkl', 'rb') as f: # _en_de.pkl
+            valid_iter = pickle.load(f)
  
-    valid_iter.initialize(curr_batch_size=args.batch_size)
+        valid_iter.initialize(curr_batch_size=args.batch_size)
 
     with open('./data/test_iterator.pkl', 'rb') as f:
         test_iter = pickle.load(f)
 
     test_iter.initialize(curr_batch_size=args.batch_size)
 
-    print("\nEncoded source language sentences:\n")
-    for i in range(5):
-        print(array_to_text(train_iter.src_sent[i], train_iter.inv_src_vocab))
+#    print("\nEncoded source language sentences:\n")
+#    for i in range(5):
+#        print(array_to_text(train_iter.src_sent[i], train_iter.inv_src_vocab))
 
-    print("\nEncoded target language sentences:\n")
-    for i in range(5):
-        print(array_to_text(train_iter.targ_sent[i], train_iter.inv_targ_vocab))
+#    print("\nEncoded target language sentences:\n")
+#    for i in range(5):
+#        print(array_to_text(train_iter.targ_sent[i], train_iter.inv_targ_vocab))
     
     duration = time() - start
 
     print("\nDataset deserialization time: %.2f seconds\n" % duration)
-
-    return train_iter, valid_iter, test_iter, train_iter.src_vocab, train_iter.targ_vocab, train_iter.inv_src_vocab, train_iter.inv_targ_vocab
+ 
+    if not infer:
+        return train_iter, valid_iter, test_iter, train_iter.src_vocab, train_iter.targ_vocab, train_iter.inv_src_vocab, train_iter.inv_targ_vocab
+    else:
+        return test_iter, test_iter.src_vocab, test_iter.inv_src_vocab, test_iter.targ_vocab, test_iter.inv_targ_vocab
 
 # WORK IN PROGRESS !!!
 def decoder_unroll(decoder, target_embed, targ_vocab, unroll_length,
@@ -390,7 +394,7 @@ class BleuScore(mx.metric.EvalMetric):
 def infer(args):
     assert args.model_prefix, "Must specifiy path to load from"
 
-    _, _, data_test, src_vocab, targ_vocab, inv_src_vocab, inv_targ_vocab = get_data('TN')
+    data_test, src_vocab, inv_src_vocab, targ_vocab, inv_targ_vocab = get_data('TN', infer=True)
 
     print "len(src_vocab) len(targ_vocab)", len(src_vocab), len(targ_vocab)
 
@@ -502,50 +506,56 @@ def infer(args):
     start = time()
 
     # mx.metric.Perplexity
-    model.score(data_test, BleuScore(invalid_label), #mx.metric.Perplexity(invalid_label),
-                batch_end_callback=mx.callback.Speedometer(batch_size=args.batch_size, frequent=1, auto_reset=True))
-    # 10
-    for bkt in range(10):
+#    model.score(data_test, BleuScore(invalid_label), #mx.metric.Perplexity(invalid_label),
+#                batch_end_callback=mx.callback.Speedometer(batch_size=args.batch_size, frequent=1, auto_reset=True))
+
+    examples = []
+    bleu_acc = 0.0
+    num_inst = 0
+
+    try:
         data_test.reset()
-        data_batch = data_test.next()
 
-        model.forward(data_batch, is_train=None)
-        source = data_batch.data[0]
-        preds = model.get_outputs()[0]
-        labels = data_batch.label[0]
+        smoothing_fn = nltk.translate.bleu_score.SmoothingFunction().method3
 
-        maxed = mx.ndarray.argmax(data=preds, axis=1)
-        pred_nparr = maxed.asnumpy()
-        src_nparr = source.asnumpy()
-        label_nparr = labels.asnumpy().astype(np.int32)
-        sent_len, batch_size = np.shape(label_nparr)
-        pred_nparr = pred_nparr.reshape(sent_len, batch_size).astype(np.int32)
+        while True:
 
+            data_batch = data_test.next()
+            model.forward(data_batch, is_train=None)
+            source = data_batch.data[0]
+            preds = model.get_outputs()[0]
+            labels = data_batch.label[0]
 
-        # range should be number of examples in the bucket 
-        for i in range(10):
-            src_lst = list(reversed(drop_sentinels(src_nparr[:, i].tolist())))
-            exp_lst = drop_sentinels(label_nparr[:, i].tolist())
-            act_lst = drop_sentinels(pred_nparr[:, i].tolist())
+            maxed = mx.ndarray.argmax(data=preds, axis=1)
+            pred_nparr = maxed.asnumpy()
+            src_nparr = source.asnumpy()
+            label_nparr = labels.asnumpy().astype(np.int32)
+            sent_len, batch_size = np.shape(label_nparr)
+            pred_nparr = pred_nparr.reshape(sent_len, batch_size).astype(np.int32)
 
-            # convert source to text
-            src_txt = array_to_text(src_lst, inv_src_vocab)
+            for i in range(batch_size):
 
-            # convert expected translation to text
-            exp_txt = array_to_text(exp_lst, inv_targ_vocab)
+                src_lst = list(reversed(drop_sentinels(src_nparr[:, i].tolist())))
+                exp_lst = drop_sentinels(label_nparr[:, i].tolist())
+                act_lst = drop_sentinels(pred_nparr[:, i].tolist())
 
-            # convert actual translation to text
-            act_txt = array_to_text(act_lst, inv_targ_vocab)
+                expected = exp_lst
+                actual = act_lst
+                bleu = nltk.translate.bleu_score.sentence_bleu(
+                    references=[expected], hypothesis=actual, weights=(0.25, 0.25, 0.25, 0.25),
+                    smoothing_function = smoothing_fn 
+                )
+                bleu_acc += bleu
+                num_inst += 1
+                examples.append((src_lst, exp_lst, act_lst, bleu))
 
-            print("\n")
-            print("Source text: %s" % src_txt)
-            print("Expected translation: %s" % exp_txt)
-            print("Actual translation: %s" % act_txt)
+    except StopIteration as se:
+        pass
+    
+    bleu_acc /= num_inst
 
-
-    infer_duration = time() - start
-    time_per_epoch = infer_duration / args.num_epochs
-    print("\n\nTime per epoch: %.2f seconds\n\n" % time_per_epoch)
+    print("\nTest set BLEU score (averaged over all examples): %.3f\n" % bleu_acc)
+    
 
 if __name__ == '__main__':
     import logging
