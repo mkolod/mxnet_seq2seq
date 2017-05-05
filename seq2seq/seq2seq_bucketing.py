@@ -9,6 +9,7 @@ import nltk
 from mxnet.rnn import LSTMCell, SequentialRNNCell, FusedRNNCell
 #from rnn_cell import LSTMCell, SequentialRNNCell
 from itertools import takewhile, dropwhile
+from operator import itemgetter
 
 from time import time
 import re
@@ -554,8 +555,23 @@ def infer(args):
     
     bleu_acc /= num_inst
 
+    # Find the top K best translations
+    examples = sorted(examples, key=itemgetter(3), reverse=True) 
+
+    num_examples = 20
+
+    print("\nSample translations:\n")
+    for i in range(min(num_examples, len(examples))):
+        src_lst, exp_lst, act_lst, bleu = examples[i]
+        src_txt = array_to_text(src_lst, data_test.inv_src_vocab)
+        exp_txt = array_to_text(exp_lst, data_test.inv_targ_vocab) 
+        act_txt = array_to_text(act_lst, data_test.inv_targ_vocab) 
+        print("\n")
+        print("Source text: %s" % src_txt)
+        print("Expected translation: %s" % exp_txt)
+        print("Actual translation: %s" % act_txt)
+    print("\n")
     print("\nTest set BLEU score (averaged over all examples): %.3f\n" % bleu_acc)
-    
 
 if __name__ == '__main__':
     import logging
