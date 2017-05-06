@@ -76,6 +76,9 @@ parser.add_argument('--inference-unrolling-for-training', action='store_true',
 parser.add_argument('--seed', type=int, default=1234,
                     help='Set random seed for Python, NumPy and MxNet RNGs')
 
+parser.add_argument('--scaling', type=float, default=1.0,
+                    help='Scaling factor for loss, gradient application, gradient clipping and Adagrad epsilon')
+
 #buckets = [32]
 # buckets = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
 
@@ -287,7 +290,7 @@ def train(args):
         rs = mx.sym.Reshape(outputs, shape=(-1, args.num_hidden), name='sym_gen_reshape1')
         fc = mx.sym.FullyConnected(data=rs, weight=fc_weight, bias=fc_bias, num_hidden=len(targ_vocab), name='sym_gen_fc')
         label_rs = mx.sym.Reshape(data=label, shape=(-1,), name='sym_gen_reshape2')
-        pred = mx.sym.SoftmaxOutput(data=fc, label=label_rs, name='sym_gen_softmax')
+        pred = mx.sym.SoftmaxOutput(data=fc, label=label_rs, name='sym_gen_softmax', grad_scale=args.scaling)
 
         return pred, ('src_data', 'targ_data',), ('softmax_label',)
 
@@ -322,7 +325,11 @@ def train(args):
     if args.optimizer not in ['adadelta', 'adagrad', 'adam', 'rmsprop']:
         opt_params['momentum'] = args.mom
 
-    opt_params['clip_gradient'] = args.max_grad_norm
+    if args.optimizer == 'adagrad':
+        opt_params['rescale_grad'] = 1.0/(args.scaling * args.batch_size)
+        opt_params['eps'] = 1e-07 * (args.scaling ** 2)
+
+    opt_params['clip_gradient'] = args.max_grad_norm * args.scaling
 
     start = time()
 
@@ -462,7 +469,7 @@ def infer(args):
         rs = mx.sym.Reshape(outputs, shape=(-1, args.num_hidden), name='sym_gen_reshape1')
         fc = mx.sym.FullyConnected(data=rs, weight=fc_weight, bias=fc_bias, num_hidden=len(targ_vocab), name='sym_gen_fc')
         label_rs = mx.sym.Reshape(data=label, shape=(-1,), name='sym_gen_reshape2')
-        pred = mx.sym.SoftmaxOutput(data=fc, label=label_rs, name='sym_gen_softmax')
+        pred = mx.sym.SoftmaxOutput(data=fc, label=label_rs, grad_scale=1.0, name='sym_gen_softmax') 
 
 #        rs = mx.sym.Reshape(outputs, shape=(-1, args.num_hidden), name='sym_gen_reshape1')
 #        fc = mx.sym.FullyConnected(data=rs, num_hidden=len(targ_vocab), name='sym_gen_fc')
