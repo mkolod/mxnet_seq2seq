@@ -68,7 +68,7 @@ ENV PYTHONPATH /root/mxnet/python
 # Build MxNet for R - WIP !!!
 #RUN apt-get -y install r-base r-base-dev
 
-RUN pip install unidecode dill tqdm
+RUN pip install unidecode dill tqdm flask wtforms
 
 WORKDIR /root/mxnet
 
