@@ -7,6 +7,9 @@ import math
 import nltk
 
 from mxnet.rnn import LSTMCell, SequentialRNNCell, FusedRNNCell
+
+from mxnet.io import DataBatch
+
 #from rnn_cell import LSTMCell, SequentialRNNCell
 from itertools import takewhile, dropwhile
 from operator import itemgetter
@@ -20,6 +23,9 @@ from utils import array_to_text, tokenize_text, invert_dict, get_s2s_data, Datas
 from seq2seq_iterator import *
 
 from attention_cell import AttentionEncoderCell, DotAttentionCell
+
+from flask import Flask, render_template, flash, request
+from wtforms import Form, TextField, TextAreaField, validators, StringField, SubmitField
 
 parser = argparse.ArgumentParser(description="Train RNN on Penn Tree Bank",
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -75,6 +81,77 @@ parser.add_argument('--inference-unrolling-for-training', action='store_true',
                     help='Feed previous prediction (instead of previous ground truth) into the decoder input during training')
 parser.add_argument('--seed', type=int, default=1234,
                     help='Set random seed for Python, NumPy and MxNet RNGs')
+
+parser.add_argument('--web-app', action='store_true',
+                    help='Run inference web app instead of test set scoring')
+
+DEBUG = True
+app = Flask(__name__)
+app.config.from_object(__name__)
+app.config['SECRET_KEY'] = '7d441f27d441f27567d441f2b6176a'
+
+web_app_model = None
+src_vocab = None
+inv_src_vocab = None
+targ_vocab = None
+inv_targ_vocab = None
+ 
+class ReusableForm(Form):
+    text = TextField('Text to be translated:', validators=[validators.required()])
+
+def web_app_translate(in_sent):
+    out_sent = None
+
+    # tokenize text
+    # transform tokenized text to NumPy array
+    # create DataBatch
+    # run inference
+    # return translated sentence string
+
+#DataBatch([src_ex, targ_ex], [label_ex], pad=0,
+#                                 bucket_key=self.bucket_idx_to_key[self.curr_bucket_id],
+#                                 provide_data=provide_data,
+#                                 provide_label=provide_label)
+
+
+    model = web_app_model
+
+    smoothing_fn = nltk.translate.bleu_score.SmoothingFunction().method3
+
+    model.forward(data_batch, is_train=None)
+    source = data_batch.data[0]
+    preds = model.get_outputs()[0]
+    labels = data_batch.label[0]
+
+    maxed = mx.ndarray.argmax(data=preds, axis=1)
+    pred_nparr = maxed.asnumpy()
+    src_nparr = source.asnumpy()
+    label_nparr = labels.asnumpy().astype(np.int32)
+    sent_len, batch_size = np.shape(label_nparr)
+    pred_nparr = pred_nparr.reshape(sent_len, batch_size).astype(np.int32)
+
+    pred = drop_sentinels(label_nparr[:, 0].tolist())
+    predexp_txt = array_to_text(exp_lst, data_test.inv_targ_vocab)
+
+    return out_sent
+
+@app.route("/", methods=['GET', 'POST'])
+def translate_route():
+    form = ReusableForm(request.form)
+ 
+    print form.errors
+    if request.method == 'POST':
+        text=request.form['text']
+        print text
+ 
+        if form.validate():
+            # Save the comment here.
+            flash('Translation: ' + text)
+        else:
+            flash('Error: All the form fields are required. ')
+ 
+    return render_template('translate.html', form=form)
+
 
 #buckets = [32]
 # buckets = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
@@ -504,6 +581,9 @@ def infer(args):
 
     opt_params['clip_gradient'] = args.max_grad_norm
 
+    if args.web_app:
+        return model, src_vocab, inv_src_vocab, targ_vocab, inv_targ_vocab
+
     start = time()
 
     # mx.metric.Perplexity
@@ -598,7 +678,10 @@ if __name__ == '__main__':
     if args.num_layers >= 4 and len(args.gpus.split(',')) >= 4 and not args.stack_rnn:
         print('WARNING: stack-rnn is recommended to train complex model on multiple GPUs')
 
-    if args.infer:
+    if args.web_app:
+        web_app_model, src_vocab, inv_src_vocab, targ_vocab, inv_targ_vocab = infer(args)
+        app.run(host='0.0.0.0')
+    elif args.infer:
         # Demonstrates how to load a model trained with CuDNN RNN and predict
         # with non-fused MXNet symbol
         infer(args)
