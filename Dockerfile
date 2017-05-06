@@ -70,6 +70,9 @@ ENV PYTHONPATH /root/mxnet/python
 
 RUN pip install unidecode dill tqdm flask wtforms
 
+# For Flask web app
+EXPOSE 5000
+
 WORKDIR /root/mxnet
 
 
