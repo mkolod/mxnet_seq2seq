@@ -15,10 +15,10 @@ from itertools import takewhile, dropwhile
 from operator import itemgetter
 
 from time import time
-import re
+import re, string
 from unidecode import unidecode
 
-from utils import array_to_text, tokenize_text, invert_dict, get_s2s_data, Dataset
+from utils import array_to_text, encode_sentences, tokenize_text, invert_dict, get_s2s_data, Dataset
 
 from seq2seq_iterator import *
 
@@ -102,23 +102,38 @@ class ReusableForm(Form):
 def web_app_translate(in_sent):
     out_sent = None
 
+    print("we are here")
+
     # tokenize text
+    in_sent = unidecode(in_sent.decode('utf-8'))
+    in_sent = re.sub('\s+', ' ', re.sub('([' + string.punctuation + '])', r' \1 ', in_sent)).split(' ')
+    in_sent = encode_sentences([in_sent], src_vocab)
+    print(in_sent)
+
     # transform tokenized text to NumPy array
-    # create DataBatch
+    src_sent = mx.ndarray.array(in_sent)
+    # these should be all zeros
+    targ_sent = mx.ndarray.array(in_sent)
+    # these should be all zeros
+    label_ex = mx.ndarray.array(in_sent)
+    provide_data = [
+        mx.io.DataDesc('src_data', (55, 1), layout='TN'),
+            mx.io.DataDesc('targ_data', (55, 1), layout='TN')] 
+    provide_label = [mx.io.DataDesc('softmax_label', (55, 1), layout='TN')]
+
+
     # run inference
     # return translated sentence string
 
-#DataBatch([src_ex, targ_ex], [label_ex], pad=0,
-#                                 bucket_key=self.bucket_idx_to_key[self.curr_bucket_id],
-#                                 provide_data=provide_data,
-#                                 provide_label=provide_label)
+    data_batch = DataBatch([src_sent, targ_sent], [label_ex], pad=0,
+                           bucket_key=(55, 55),
+                           provide_data=provide_data,
+                           provide_label=provide_label)
 
-
-    model = web_app_model
 
     smoothing_fn = nltk.translate.bleu_score.SmoothingFunction().method3
 
-    model.forward(data_batch, is_train=None)
+    web_app_model.forward(data_batch, is_train=None)
     source = data_batch.data[0]
     preds = model.get_outputs()[0]
     labels = data_batch.label[0]
@@ -131,7 +146,7 @@ def web_app_translate(in_sent):
     pred_nparr = pred_nparr.reshape(sent_len, batch_size).astype(np.int32)
 
     pred = drop_sentinels(label_nparr[:, 0].tolist())
-    predexp_txt = array_to_text(exp_lst, data_test.inv_targ_vocab)
+    predexp_txt = array_to_text(exp_lst, inv_targ_vocab)
 
     return out_sent
 
@@ -146,7 +161,7 @@ def translate_route():
  
         if form.validate():
             # Save the comment here.
-            flash('Translation: ' + text)
+            flash('Translation: ' + web_app_translate(text))
         else:
             flash('Error: All the form fields are required. ')
  
