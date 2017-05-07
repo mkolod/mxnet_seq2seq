@@ -327,10 +327,10 @@ def train(args):
 
     opt_params['rescale_grad'] = 1.0/(args.scaling * args.batch_size)
 
-    if args.optimizer == 'adagrad':
-        opt_params['eps'] = 1e-07 * (args.scaling ** 2)
+#    if args.optimizer == 'adagrad':
+#        opt_params['eps'] = 1e-07 * (args.scaling ** 2)
 
-    opt_params['clip_gradient'] = args.max_grad_norm * args.scaling
+    opt_params['clip_gradient'] = args.max_grad_norm # * args.scaling
 
     start = time()
 
