@@ -6,7 +6,7 @@ cd data/
 #wget http://statmt.org/europarl/v7/es-en.tgz
 #tar xvf es-en.tgz && rm es-en.tgz
 
-TRAIN_SENT_CT=10000
+TRAIN_SENT_CT=1000000
 VAL_SENT_CT=1000
 
 head -n ${TRAIN_SENT_CT} europarl-v7.es-en.en > europarl-v7.es-en.en_train_small

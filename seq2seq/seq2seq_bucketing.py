@@ -102,31 +102,35 @@ class ReusableForm(Form):
 def web_app_translate(in_sent):
     out_sent = None
 
-    print("we are here")
-
     # tokenize text
     in_sent = unidecode(in_sent.decode('utf-8'))
     in_sent = re.sub('\s+', ' ', re.sub('([' + string.punctuation + '])', r' \1 ', in_sent)).split(' ')
+    print("Original: %s" % in_sent[0])
+    in_sent = list(reversed(in_sent))
+    in_sent.append('<EOS>')
     in_sent = encode_sentences([in_sent], src_vocab)
-    print(in_sent)
+#    print(array_to_text(in_sent[0], inv_src_vocab))
 
     # transform tokenized text to NumPy array
-    src_sent = mx.ndarray.array(in_sent)
+    src_sent = mx.ndarray.array(in_sent).T
     # these should be all zeros
-    targ_sent = mx.ndarray.array(in_sent)
+    targ_sent = mx.ndarray.array(in_sent).T
+    # <GO> symbol
+    targ_sent[0] = 3
+    
     # these should be all zeros
-    label_ex = mx.ndarray.array(in_sent)
+    label_ex = mx.ndarray.array(in_sent).T
     provide_data = [
-        mx.io.DataDesc('src_data', (55, 1), layout='TN'),
-            mx.io.DataDesc('targ_data', (55, 1), layout='TN')] 
-    provide_label = [mx.io.DataDesc('softmax_label', (55, 1), layout='TN')]
+        mx.io.DataDesc('src_data', (len(in_sent[0]), 1), layout='TN'),
+            mx.io.DataDesc('targ_data', (len(in_sent[0]), 1), layout='TN')] 
+    provide_label = [mx.io.DataDesc('softmax_label', (len(in_sent[0]), 1), layout='TN')]
 
 
     # run inference
     # return translated sentence string
 
     data_batch = DataBatch([src_sent, targ_sent], [label_ex], pad=0,
-                           bucket_key=(55, 55),
+                           bucket_key=(len(in_sent[0]), len(in_sent[0])),
                            provide_data=provide_data,
                            provide_label=provide_label)
 
@@ -135,7 +139,7 @@ def web_app_translate(in_sent):
 
     web_app_model.forward(data_batch, is_train=None)
     source = data_batch.data[0]
-    preds = model.get_outputs()[0]
+    preds = web_app_model.get_outputs()[0]
     labels = data_batch.label[0]
 
     maxed = mx.ndarray.argmax(data=preds, axis=1)
@@ -143,10 +147,11 @@ def web_app_translate(in_sent):
     src_nparr = source.asnumpy()
     label_nparr = labels.asnumpy().astype(np.int32)
     sent_len, batch_size = np.shape(label_nparr)
-    pred_nparr = pred_nparr.reshape(sent_len, batch_size).astype(np.int32)
+    pred_nparr = pred_nparr.reshape(batch_size, sent_len).astype(np.int32)
 
     pred = drop_sentinels(label_nparr[:, 0].tolist())
-    predexp_txt = array_to_text(exp_lst, inv_targ_vocab)
+    out_sent = array_to_text(pred, inv_targ_vocab)
+    print("Translation: %s\n" % out_sent)
 
     return out_sent
 

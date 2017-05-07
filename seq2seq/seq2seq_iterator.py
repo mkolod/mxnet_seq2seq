@@ -330,7 +330,6 @@ class Seq2SeqIter(DataIter):
                 else:
                     raise Exception("Layout must be 'TN' or 'NT'") 
 
- 
                 batch = DataBatch([src_ex, targ_ex], [label_ex], pad=0,
                                  bucket_key=self.bucket_idx_to_key[self.curr_bucket_id],
                                  provide_data=provide_data,
