@@ -105,9 +105,8 @@ def web_app_translate(in_sent):
     # tokenize text
     in_sent = unidecode(in_sent.decode('utf-8'))
     in_sent = re.sub('\s+', ' ', re.sub('([' + string.punctuation + '])', r' \1 ', in_sent)).split(' ')
-    print("Original: %s" % in_sent[0])
+    print("Original: %s" % ' '.join(in_sent))
     in_sent = list(reversed(in_sent))
-    in_sent.append('<EOS>')
     in_sent = encode_sentences([in_sent], src_vocab)
 #    print(array_to_text(in_sent[0], inv_src_vocab))
 
