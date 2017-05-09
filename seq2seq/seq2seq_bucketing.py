@@ -102,34 +102,67 @@ class ReusableForm(Form):
 def web_app_translate(in_sent):
     out_sent = None
 
+
+    examples = []
+    bleu_acc = 0.0
+    num_inst = 0
+
+#        data_test.reset()
+#
+#
+#            data_batch = data_test.next()
+#            model.forward(data_batch, is_train=None)
+#            source = data_batch.data[0]
+#            preds = model.get_outputs()[0]
+#            labels = data_batch.label[0]
+#
+#            maxed = mx.ndarray.argmax(data=preds, axis=1)
+#            pred_nparr = maxed.asnumpy()
+#            src_nparr = source.asnumpy()
+#            label_nparr = labels.asnumpy().astype(np.int32)
+#            sent_len, batch_size = np.shape(label_nparr)
+#            pred_nparr = pred_nparr.reshape(sent_len, batch_size).astype(np.int32)
+#
+#            for i in range(batch_size):
+#
+#                src_lst = list(reversed(drop_sentinels(src_nparr[:, i].tolist())))
+#                exp_lst = drop_sentinels(label_nparr[:, i].tolist())
+#                act_lst = drop_sentinels(pred_nparr[:, i].tolist())
+
+
     # tokenize text
     in_sent = unidecode(in_sent.decode('utf-8'))
     in_sent = re.sub('\s+', ' ', re.sub('([' + string.punctuation + '])', r' \1 ', in_sent)).split(' ')
     print("Original: %s" % ' '.join(in_sent))
     in_sent = list(reversed(in_sent))
     in_sent = encode_sentences([in_sent], src_vocab)
+#    out1_sent = [3]
+#    out1_sent.extend([0] * len(in_sent[0]))
+#    out1_sent = [out1_sent]
+    out1_sent = [0] * 55 #len(in_sent[0])
+    out1_sent[0] = 3
+    out1_sent = [out1_sent]
 #    print(array_to_text(in_sent[0], inv_src_vocab))
 
     # transform tokenized text to NumPy array
     src_sent = mx.ndarray.array(in_sent).T
     # these should be all zeros
-    targ_sent = mx.ndarray.array(in_sent).T
+    targ_sent = mx.ndarray.array(out1_sent).T
     # <GO> symbol
-    targ_sent[0] = 3
     
     # these should be all zeros
-    label_ex = mx.ndarray.array(in_sent).T
+    label_ex = mx.ndarray.array(out1_sent).T
     provide_data = [
         mx.io.DataDesc('src_data', (len(in_sent[0]), 1), layout='TN'),
-            mx.io.DataDesc('targ_data', (len(in_sent[0]), 1), layout='TN')] 
-    provide_label = [mx.io.DataDesc('softmax_label', (len(in_sent[0]), 1), layout='TN')]
+            mx.io.DataDesc('targ_data', (55, 1), layout='TN')] 
+    provide_label = [mx.io.DataDesc('softmax_label', (55, 1), layout='TN')]
 
 
     # run inference
     # return translated sentence string
 
     data_batch = DataBatch([src_sent, targ_sent], [label_ex], pad=0,
-                           bucket_key=(len(in_sent[0]), len(in_sent[0])),
+                           bucket_key=(len(in_sent[0]), 55),
                            provide_data=provide_data,
                            provide_label=provide_label)
 
@@ -140,19 +173,26 @@ def web_app_translate(in_sent):
     source = data_batch.data[0]
     preds = web_app_model.get_outputs()[0]
     labels = data_batch.label[0]
+    print(source.asnumpy(), preds.asnumpy(), labels.asnumpy())
 
     maxed = mx.ndarray.argmax(data=preds, axis=1)
     pred_nparr = maxed.asnumpy()
-    src_nparr = source.asnumpy()
-    label_nparr = labels.asnumpy().astype(np.int32)
-    sent_len, batch_size = np.shape(label_nparr)
-    pred_nparr = pred_nparr.reshape(batch_size, sent_len).astype(np.int32)
+    print("\n" + str(pred_nparr))
+    pp = pred_nparr.tolist()
+    text = array_to_text(drop_sentinels(pp), inv_targ_vocab)
+    return text
+#    return array_to_text(pp, inv_targ_vocab)
 
-    pred = drop_sentinels(label_nparr[:, 0].tolist())
-    out_sent = array_to_text(pred, inv_targ_vocab)
-    print("Translation: %s\n" % out_sent)
+#    src_nparr = source.asnumpy()
+#    label_nparr = labels.asnumpy().astype(np.int32)
+#    sent_len, batch_size = np.shape(label_nparr)
+#    pred_nparr = pred_nparr.reshape(batch_size, sent_len).astype(np.int32)
 
-    return out_sent
+#    pred = drop_sentinels(pred_nparr[:, 0].tolist())
+#    out_sent = array_to_text(pred, inv_targ_vocab)
+#    print("Translation: %s\n" % out_sent)
+#
+#    return out_sent
 
 @app.route("/", methods=['GET', 'POST'])
 def translate_route():
@@ -621,6 +661,12 @@ def infer(args):
         while True:
 
             data_batch = data_test.next()
+
+#            db = data_batch.data[0]
+#            db2 = data_batch.data[1]
+#            db3 = data_batch.label[0]
+#            print(db, db2, db3)
+
             model.forward(data_batch, is_train=None)
             source = data_batch.data[0]
             preds = model.get_outputs()[0]
