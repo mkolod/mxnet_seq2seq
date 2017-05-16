@@ -38,8 +38,12 @@ How to run the scripts?
 Credits
 -------
 
-Thanks to Eric Xie (@piiswrong) for the attention cell implementation.
+Many thanks to Eric Xie (@piiswrong), Sheng Zha (@szha) and Antti-Pekka Hynninen (@ap-hynninen) for valuable input.
 
+License
+-------
+
+This project is licensed under the Apache 2.0 license. See the text of the license [here](https://github.com/mkolod/mxnet_seq2seq/blob/master/LICENSE.txt).
 
 > **Note:**
 
