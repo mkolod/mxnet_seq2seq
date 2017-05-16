@@ -183,10 +183,9 @@ def get_data(layout, infer=False):
     else:
         return test_iter, test_iter.src_vocab, test_iter.inv_src_vocab, test_iter.targ_vocab, test_iter.inv_targ_vocab
 
-# WORK IN PROGRESS !!!
-def decoder_unroll(decoder, target_embed, targ_vocab, unroll_length,
-                  go_symbol,
-                  fc_weight, fc_bias, targ_em_weight,
+
+def infer_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unroll_length,
+                  go_symbol, fc_weight, fc_bias, attention_fc_weight, attention_fc_bias, targ_em_weight,
                   begin_state=None, layout='TNC', merge_outputs=None):
 
         decoder.reset()
@@ -202,10 +201,6 @@ def decoder_unroll(decoder, target_embed, targ_vocab, unroll_length,
 
         embed = inputs[0]
 
-        # NEW 1
-#        fc_weight = mx.sym.Variable('fc_weight')
-#        fc_bias = mx.sym.Variable('fc_bias')
-#        targ_em_weight = mx.sym.Variable('targ_em_weight')
         for i in range(0, unroll_length):
             output, states = decoder(embed, states)
             outputs.append(output)
@@ -213,11 +208,6 @@ def decoder_unroll(decoder, target_embed, targ_vocab, unroll_length,
             am = mx.sym.argmax(data=fc, axis=1)
             embed = mx.sym.Embedding(data=am, weight=targ_em_weight, input_dim=len(targ_vocab),
                 output_dim=args.num_embed, name='decoder_embed%d_'%i)
-
-        # NEW 2
-#        for i in range(0, unroll_length):
-#            embed, states = decoder(embed, states)
-#            outputs.append(embed)
 
         outputs, _ = _normalize_sequence(unroll_length, outputs, layout, merge_outputs)
 
@@ -229,6 +219,9 @@ def train(args):
 
     data_train, data_val, _, src_vocab, targ_vocab, inv_src_vocab, inv_targ_vocab = get_data('TN')
     print "len(src_vocab) len(targ_vocab)", len(src_vocab), len(targ_vocab)
+
+    attention_fc_weight = mx.sym.Variable('attention_fc_weight')
+    attention_fc_bias = mx.sym.Variable('attention_fc_bias')
 
     fc_weight = mx.sym.Variable('fc_weight')
     fc_bias = mx.sym.Variable('fc_bias')
@@ -244,7 +237,7 @@ def train(args):
             encoder.add(LSTMCell(args.num_hidden, prefix='rnn_encoder%d_' % i))
             if i < args.num_layers - 1 and args.dropout > 0.0:
                 encoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_encoder%d_' % i))
-    encoder.add(AttentionEncoderCell())
+#    encoder.add(AttentionEncoderCell())
 
     decoder = mx.rnn.SequentialRNNCell()
 
@@ -256,7 +249,7 @@ def train(args):
             decoder.add(LSTMCell(args.num_hidden, prefix=('rnn_decoder%d_' % i)))
             if i < args.num_layers - 1 and args.dropout > 0.0:
                 decoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_decoder%d_' % i))
-    decoder.add(DotAttentionCell())
+#    decoder.add(DotAttentionCell())
 
     def sym_gen(seq_len):
         src_data = mx.sym.Variable('src_data')
@@ -274,14 +267,16 @@ def train(args):
         enc_seq_len, dec_seq_len = seq_len
 
         layout = 'TNC'
-        _, states = encoder.unroll(enc_seq_len, inputs=src_embed, layout=layout)
+        encoder_outputs, encoder_states = encoder.unroll(enc_seq_len, inputs=src_embed, layout=layout)
 
         # This should be based on EOS or max seq len for inference, but here we unroll to the target length
         # TODO: fix <GO> symbol
         if args.inference_unrolling_for_training:
-            outputs, _ = decoder_unroll(decoder, targ_embed, targ_vocab, dec_seq_len, 0, fc_weight, fc_bias, targ_em_weight, begin_state=states, layout='TNC', merge_outputs=True)
+            outputs, _ = infer_decoder_unroll(decoder, encoder_outputs, targ_embed, targ_vocab, dec_seq_len, 0, fc_weight, fc_bias,
+                             attention_fc_weight, attention_fc_bias, 
+                             targ_em_weight, begin_state=encoder_states, layout='TNC', merge_outputs=True)
         else:
-            outputs, _ = decoder.unroll(dec_seq_len, targ_embed, begin_state=states, layout=layout, merge_outputs=True)
+            outputs, _ = decoder.unroll(dec_seq_len, targ_embed, begin_state=encoder_states, layout=layout, merge_outputs=True)
 
         # NEW
         rs = mx.sym.Reshape(outputs, shape=(-1, args.num_hidden), name='sym_gen_reshape1')
@@ -399,6 +394,9 @@ def infer(args):
 
     print "len(src_vocab) len(targ_vocab)", len(src_vocab), len(targ_vocab)
 
+    attention_fc_weight = mx.sym.Variable('attention_fc_weight')
+    attention_fc_bias = mx.sym.Variable('attention_fc_bias')
+
     fc_weight = mx.sym.Variable('fc_weight')
     fc_bias = mx.sym.Variable('fc_bias')
     targ_em_weight = mx.sym.Variable('targ_embed_weight')
@@ -415,7 +413,7 @@ def infer(args):
             if i < args.num_layers - 1 and args.dropout > 0.0:
                 encoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_encoder%d_' % i))
 
-    encoder.add(AttentionEncoderCell())
+#    encoder.add(AttentionEncoderCell())
 
     if args.use_cudnn_cells:
         decoder = mx.rnn.FusedRNNCell(args.num_hidden, num_layers=args.num_layers, 
@@ -429,7 +427,7 @@ def infer(args):
             if i < args.num_layers - 1 and args.dropout > 0.0:
                 decoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_decoder%d_' % i))
 
-    decoder.add(DotAttentionCell())
+#    decoder.add(DotAttentionCell())
 
     def sym_gen(seq_len):
         src_data = mx.sym.Variable('src_data')
@@ -448,14 +446,16 @@ def infer(args):
         enc_seq_len, dec_seq_len = seq_len
 
         layout = 'TNC'
-        _, states = encoder.unroll(enc_seq_len, inputs=src_embed, layout=layout)
+        encoder_outputs, encoder_states = encoder.unroll(enc_seq_len, inputs=src_embed, layout=layout)
 
         # This should be based on EOS or max seq len for inference, but here we unroll to the target length
         # TODO: fix <GO> symbol
 #        outputs, _ = decoder.unroll(dec_seq_len, targ_embed, begin_state=states, layout=layout, merge_outputs=True)
-        outputs, _ = decoder_unroll(decoder, targ_embed, targ_vocab, dec_seq_len, 0, 
-                     fc_weight, fc_bias, targ_em_weight,
-                     begin_state=states, layout='TNC', merge_outputs=True)
+        outputs, _ = infer_decoder_unroll(decoder, encoder_outputs, targ_embed, targ_vocab, dec_seq_len, 0,
+                     fc_weight, fc_bias, 
+                     attention_fc_weight, attention_fc_bias,
+                     targ_em_weight,
+                     begin_state=encoder_states, layout='TNC', merge_outputs=True)
 
         # NEW
 
