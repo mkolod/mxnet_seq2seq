@@ -203,7 +203,7 @@ def train_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unr
 
         for i in range(0, unroll_length):
 
-            output, states = decoder(inputs[j], states)             
+            output, states = decoder(inputs[i], states)             
             transposed = mx.sym.transpose(output, axes=(0, 2, 1))
 
             alignments = []
@@ -230,6 +230,55 @@ def train_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unr
             outputs.append(att_tanh) 
 
         return outputs, states
+
+def infer_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unroll_length,
+                  go_symbol, fc_weight, fc_bias, attention_fc_weight, attention_fc_bias, targ_em_weight,
+                  begin_state=None, layout='TNC', merge_outputs=None):
+
+        decoder.reset()
+
+        if begin_state is None:
+            begin_state = decoder.begin_state()
+
+        inputs, _ = _normalize_sequence(unroll_length, target_embed, layout, False)
+
+        # Need to use hidden state from attention model, but <GO> as input
+        states = begin_state
+        outputs = []
+
+        embed = inputs[0]
+
+        for i in range(0, unroll_length):
+
+            output, states = decoder(inputs[j], states)
+            transposed = mx.sym.transpose(output, axes=(0, 2, 1))
+
+            alignments = []
+
+            for j in range(len(encoder_outputs)):
+
+                alignments.append(mx.sym.batch_dot(transposed, encoder_outputs[j]))
+
+            alignments = mx.sym.softmax(mx.sym.Group(alignments))
+
+            weighted = encoder_outputs[0] * alignments[0]
+
+            for j in range(1, len(encoder_outputs)):
+                weighted += encoder_outputs[j] * alignments[j]
+
+            concatenated = mx.sym.concat(inputs[i], weighted)
+
+            attention_fc = mx.sym.FullyConnected(
+                data=concatenated, weight=attention_fc_weight, bias=attention_fc_bias, num_hidden=args.num_hidden, name='attention_fc%d_' % i
+            )
+
+            att_tanh = mx.sym.Activation(data = attention_fc, act_type='tanh', name = 'attention_tanh%d_' % i)
+
+            outputs.append(att_tanh)
+
+        return outputs, states
+
+
 
 def train(args):
 
