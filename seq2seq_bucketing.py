@@ -202,14 +202,44 @@ def infer_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unr
         embed = inputs[0]
 
         for i in range(0, unroll_length):
-            output, states = decoder(embed, states)
-            outputs.append(output)
-            fc = mx.sym.FullyConnected(data=output, weight=fc_weight, bias=fc_bias, num_hidden=len(targ_vocab), name='decoder_fc%d_'%i)
-            am = mx.sym.argmax(data=fc, axis=1)
-            embed = mx.sym.Embedding(data=am, weight=targ_em_weight, input_dim=len(targ_vocab),
-                output_dim=args.num_embed, name='decoder_embed%d_'%i)
 
-        outputs, _ = _normalize_sequence(unroll_length, outputs, layout, merge_outputs)
+             output, states = decoder(inputs[j], states)             
+             transposed = mx.sym.transpose(output, axes=(0, 2, 1))
+
+             alignments = []
+
+             for j in range(len(encoder_outputs)):
+ 
+                 alignments.append(mx.sym.batch_dot(transposed, encoder_outputs[j]))
+
+             alignments = mx.sym.softmax(mx.sym.Group(alignments))
+             
+             
+	     
+
+#                 concatted = mx.sym.concat(inputs, decoder_outputs[j])
+#                 att_fc = mx.sym.FullyConnected(
+#                     data=concatted, weight=attention_fc_weight, bias=attention_fc_bias, num_hidden=args.num_hidden, name='attention_fc%d_' % j
+#                 )
+#                 att_tanh = mx.sym.Activation(data=att_fc, act_type="tanh", name='attention_tanh%d_' % j)
+
+ 
+#                 dots.append(concatted)
+#                 dots = mx.sym.Group(dots)
+
+#            if len(decoder_outputs) > 1:
+#                attention_states = [symbol.concat(*decoder_outputs, dim=1)]
+
+#            concatted = decoder_outputs *            
+ 
+#            output, states = decoder(embed, states)
+#            outputs.append(output)
+#            fc = mx.sym.FullyConnected(data=output, weight=fc_weight, bias=fc_bias, num_hidden=len(targ_vocab), name='decoder_fc%d_'%i)
+#            am = mx.sym.argmax(data=fc, axis=1)
+#            embed = mx.sym.Embedding(data=am, weight=targ_em_weight, input_dim=len(targ_vocab),
+#                output_dim=args.num_embed, name='decoder_embed%d_'%i)
+#
+#        outputs, _ = _normalize_sequence(unroll_length, outputs, layout, merge_outputs)
 
         return outputs, states
 
