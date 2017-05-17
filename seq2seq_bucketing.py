@@ -231,6 +231,8 @@ def train_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unr
 
         return outputs, states
 
+# This requires a rewrite now that we're adding attention. 
+# See the pre-attention version for hints.
 def infer_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unroll_length,
                   go_symbol, fc_weight, fc_bias, attention_fc_weight, attention_fc_bias, targ_em_weight,
                   begin_state=None, layout='TNC', merge_outputs=None):
