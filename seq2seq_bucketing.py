@@ -184,7 +184,7 @@ def get_data(layout, infer=False):
         return test_iter, test_iter.src_vocab, test_iter.inv_src_vocab, test_iter.targ_vocab, test_iter.inv_targ_vocab
 
 
-def infer_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unroll_length,
+def train_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unroll_length,
                   go_symbol, fc_weight, fc_bias, attention_fc_weight, attention_fc_bias, targ_em_weight,
                   begin_state=None, layout='TNC', merge_outputs=None):
 
@@ -203,43 +203,31 @@ def infer_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unr
 
         for i in range(0, unroll_length):
 
-             output, states = decoder(inputs[j], states)             
-             transposed = mx.sym.transpose(output, axes=(0, 2, 1))
+            output, states = decoder(inputs[j], states)             
+            transposed = mx.sym.transpose(output, axes=(0, 2, 1))
 
-             alignments = []
+            alignments = []
 
-             for j in range(len(encoder_outputs)):
+            for j in range(len(encoder_outputs)):
  
-                 alignments.append(mx.sym.batch_dot(transposed, encoder_outputs[j]))
+                alignments.append(mx.sym.batch_dot(transposed, encoder_outputs[j]))
 
-             alignments = mx.sym.softmax(mx.sym.Group(alignments))
-             
-             
-	     
+            alignments = mx.sym.softmax(mx.sym.Group(alignments))
 
-#                 concatted = mx.sym.concat(inputs, decoder_outputs[j])
-#                 att_fc = mx.sym.FullyConnected(
-#                     data=concatted, weight=attention_fc_weight, bias=attention_fc_bias, num_hidden=args.num_hidden, name='attention_fc%d_' % j
-#                 )
-#                 att_tanh = mx.sym.Activation(data=att_fc, act_type="tanh", name='attention_tanh%d_' % j)
+            weighted = encoder_outputs[0] * alignments[0]
 
- 
-#                 dots.append(concatted)
-#                 dots = mx.sym.Group(dots)
+            for j in range(1, len(encoder_outputs)):
+                weighted += encoder_outputs[j] * alignments[j]
+                          
+            concatenated = mx.sym.concat(inputs[i], weighted)
 
-#            if len(decoder_outputs) > 1:
-#                attention_states = [symbol.concat(*decoder_outputs, dim=1)]
-
-#            concatted = decoder_outputs *            
- 
-#            output, states = decoder(embed, states)
-#            outputs.append(output)
-#            fc = mx.sym.FullyConnected(data=output, weight=fc_weight, bias=fc_bias, num_hidden=len(targ_vocab), name='decoder_fc%d_'%i)
-#            am = mx.sym.argmax(data=fc, axis=1)
-#            embed = mx.sym.Embedding(data=am, weight=targ_em_weight, input_dim=len(targ_vocab),
-#                output_dim=args.num_embed, name='decoder_embed%d_'%i)
-#
-#        outputs, _ = _normalize_sequence(unroll_length, outputs, layout, merge_outputs)
+            attention_fc = mx.sym.FullyConnected(
+                data=concatenated, weight=attention_fc_weight, bias=attention_fc_bias, num_hidden=args.num_hidden, name='attention_fc%d_' % i
+            )
+  
+            att_tanh = mx.sym.Activation(data = attention_fc, act_type='tanh', name = 'attention_tanh%d_' % i)
+	    
+            outputs.append(att_tanh) 
 
         return outputs, states
 
@@ -306,7 +294,11 @@ def train(args):
                              attention_fc_weight, attention_fc_bias, 
                              targ_em_weight, begin_state=encoder_states, layout='TNC', merge_outputs=True)
         else:
-            outputs, _ = decoder.unroll(dec_seq_len, targ_embed, begin_state=encoder_states, layout=layout, merge_outputs=True)
+            outputs, _ = train_decoder_unroll(decoder, encoder_outputs, targ_embed, targ_vocab, dec_seq_len, 0, fc_weight, fc_bias,
+                             attention_fc_weight, attention_fc_bias, 
+                             targ_em_weight, begin_state=encoder_states, layout='TNC', merge_outputs=True)
+
+#            outputs, _ = decoder.unroll(dec_seq_len, targ_embed, begin_state=encoder_states, layout=layout, merge_outputs=True)
 
         # NEW
         rs = mx.sym.Reshape(outputs, shape=(-1, args.num_hidden), name='sym_gen_reshape1')
