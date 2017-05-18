@@ -188,8 +188,6 @@ def train_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unr
                   go_symbol, fc_weight, fc_bias, attention_fc_weight, attention_fc_bias, targ_em_weight,
                   begin_state=None, layout='TNC', merge_outputs=None):
 
-        print("EEFE#F#RF$F")
-
         decoder.reset()
 
         if begin_state is None:
@@ -205,14 +203,21 @@ def train_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unr
 
         for i in range(0, unroll_length):
 
-            output, states = decoder(inputs[i], states)             
-            transposed = mx.sym.transpose(output, axes=(0, 2, 1))
+            output, states = decoder(inputs[i], states)            
+            # axes=(0, 2, 1) 
+#           transposed = mx.sym.transpose(output, axes=(1, 0), name='train_decoder_transpose%d_' % i)
+            transposed = mx.sym.expand_dims(output, axis=2)
+            transposed = mx.sym.transpose(transposed, axes=(0, 2, 1), name='train_decoder_transpose%d_' % i)
 
             alignments = []
 
             for j in range(len(encoder_outputs)):
 
-                dot = mx.sym.batch_dot(transposed, encoder_outputs[j]) 
+                enc_out = encoder_outputs[j]
+                enc_out = mx.sym.expand_dims(enc_out, axis=2)
+
+#                dot = mx.sym.batch_dot(transposed, enc_out) 
+                dot = mx.sym.broadcast_mul(transposed, enc_out, name='train_decoder_broadcast_mul%d_' % j)
                 sm = mx.sym.softmax(dot)
                 alignments.append(sm)
 
