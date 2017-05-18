@@ -188,6 +188,8 @@ def train_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unr
                   go_symbol, fc_weight, fc_bias, attention_fc_weight, attention_fc_bias, targ_em_weight,
                   begin_state=None, layout='TNC', merge_outputs=None):
 
+        print("EEFE#F#RF$F")
+
         decoder.reset()
 
         if begin_state is None:
@@ -209,12 +211,17 @@ def train_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unr
             alignments = []
 
             for j in range(len(encoder_outputs)):
+
+                dot = mx.sym.batch_dot(transposed, encoder_outputs[j]) 
+                sm = mx.sym.softmax(dot)
+                alignments.append(sm)
+
+#            alignments = mx.sym.Group(alignments)
  
-                alignments.append(mx.sym.batch_dot(transposed, encoder_outputs[j]))
-
-            alignments = mx.sym.softmax(mx.sym.Group(alignments))
-
             weighted = encoder_outputs[0] * alignments[0]
+
+            print(weighted)
+            print(type(weighted))
 
             for j in range(1, len(encoder_outputs)):
                 weighted += encoder_outputs[j] * alignments[j]
@@ -227,7 +234,10 @@ def train_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unr
   
             att_tanh = mx.sym.Activation(data = attention_fc, act_type='tanh', name = 'attention_tanh%d_' % i)
 	    
-            outputs.append(att_tanh) 
+            outputs.append(att_tanh)
+
+
+        outputs, _ = _normalize_sequence(unroll_length, outputs, layout, merge_outputs)
 
         return outputs, states
 
@@ -252,16 +262,19 @@ def infer_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unr
 
         for i in range(0, unroll_length):
 
-            output, states = decoder(inputs[j], states)
+            output, states = decoder(inputs[i], states)
             transposed = mx.sym.transpose(output, axes=(0, 2, 1))
 
             alignments = []
 
             for j in range(len(encoder_outputs)):
 
-                alignments.append(mx.sym.batch_dot(transposed, encoder_outputs[j]))
+                dot = mx.sym.batch_dot(transposed, encoder_outputs[j])
+                sm = mx.sym.softmax(dot)
+            
+                alignments.append(sm)
 
-            alignments = mx.sym.softmax(mx.sym.Group(alignments))
+#            alignments = mx.sym.Group(alignments)
 
             weighted = encoder_outputs[0] * alignments[0]
 
@@ -351,6 +364,11 @@ def train(args):
 
 #            outputs, _ = decoder.unroll(dec_seq_len, targ_embed, begin_state=encoder_states, layout=layout, merge_outputs=True)
 
+        print(outputs)
+        print(type(outputs))
+
+        print("\n")
+ 
         # NEW
         rs = mx.sym.Reshape(outputs, shape=(-1, args.num_hidden), name='sym_gen_reshape1')
         fc = mx.sym.FullyConnected(data=rs, weight=fc_weight, bias=fc_bias, num_hidden=len(targ_vocab), name='sym_gen_fc')
