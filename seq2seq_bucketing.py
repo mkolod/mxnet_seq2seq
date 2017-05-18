@@ -58,6 +58,7 @@ parser.add_argument('--disp-batches', type=int, default=50,
                     help='show progress for every n batches')
 parser.add_argument('--max-grad-norm', type=float, default=5.0,
                     help='maximum gradient norm (larger values will be clipped')
+
 # When training a deep, complex model, it's recommended to stack fused RNN cells (one
 # layer per cell) together instead of one with all layers. The reason is that fused RNN
 # cells doesn't set gradients to be ready until the computation for the entire layer is
@@ -75,6 +76,9 @@ parser.add_argument('--inference-unrolling-for-training', action='store_true',
                     help='Feed previous prediction (instead of previous ground truth) into the decoder input during training')
 parser.add_argument('--seed', type=int, default=1234,
                     help='Set random seed for Python, NumPy and MxNet RNGs')
+
+parser.add_argument('--remove-state-feed', action='store_true',
+                    help='Remove direct state feeding from encoder to decoder (use when using attention)')
 
 #buckets = [32]
 # buckets = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
@@ -354,6 +358,9 @@ def train(args):
 
         layout = 'TNC'
         encoder_outputs, encoder_states = encoder.unroll(enc_seq_len, inputs=src_embed, layout=layout)
+
+        if args.remove_state_feed:
+            encoder_states = None
 
         # This should be based on EOS or max seq len for inference, but here we unroll to the target length
         # TODO: fix <GO> symbol
