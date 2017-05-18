@@ -206,27 +206,26 @@ def train_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unr
             output, states = decoder(inputs[i], states)            
             # axes=(0, 2, 1) 
 #           transposed = mx.sym.transpose(output, axes=(1, 0), name='train_decoder_transpose%d_' % i)
-            transposed = mx.sym.expand_dims(output, axis=2)
-            transposed = mx.sym.transpose(transposed, axes=(0, 2, 1), name='train_decoder_transpose%d_' % i)
+#            transposed = mx.sym.expand_dims(output, axis=2)
+#            transposed = mx.sym.transpose(transposed, axes=(0, 2, 1), name='train_decoder_transpose%d_' % i)
+            transposed = output
 
             alignments = []
 
             for j in range(len(encoder_outputs)):
 
                 enc_out = encoder_outputs[j]
-                enc_out = mx.sym.expand_dims(enc_out, axis=2)
+#                enc_out = mx.sym.expand_dims(enc_out, axis=2)
 
 #                dot = mx.sym.batch_dot(transposed, enc_out) 
-                dot = mx.sym.broadcast_mul(transposed, enc_out, name='train_decoder_broadcast_mul%d_' % j)
+                dot = transposed * enc_out
+#                dot = mx.sym.broadcast_mul(transposed, enc_out, name='train_decoder_broadcast_mul%d_' % j)
                 sm = mx.sym.softmax(dot)
                 alignments.append(sm)
 
 #            alignments = mx.sym.Group(alignments)
  
             weighted = encoder_outputs[0] * alignments[0]
-
-            print(weighted)
-            print(type(weighted))
 
             for j in range(1, len(encoder_outputs)):
                 weighted += encoder_outputs[j] * alignments[j]
