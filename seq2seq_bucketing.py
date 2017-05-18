@@ -368,11 +368,6 @@ def train(args):
 
 #            outputs, _ = decoder.unroll(dec_seq_len, targ_embed, begin_state=encoder_states, layout=layout, merge_outputs=True)
 
-        print(outputs)
-        print(type(outputs))
-
-        print("\n")
- 
         # NEW
         rs = mx.sym.Reshape(outputs, shape=(-1, args.num_hidden), name='sym_gen_reshape1')
         fc = mx.sym.FullyConnected(data=rs, weight=fc_weight, bias=fc_bias, num_hidden=len(targ_vocab), name='sym_gen_fc')
