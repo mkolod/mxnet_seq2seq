@@ -203,13 +203,17 @@ def train_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unr
 #        states = encoder_outputs[:-1]
 
 #        states = encoder_outputs[:-1]
-        states = mx.sym.concat(*encoder_outputs)  # begin_state
+        states = mx.sym.concat(*encoder_outputs[-1:])  # begin_state
+ 
+        states = mx.sym.FullyConnected(
+            data=states, weight=attention_fc_weight, bias=attention_fc_bias, num_hidden=args.num_hidden, name='attention_fc%d_' % 0
+        )
+
         attention = mx.sym.expand_dims(states[0], axis=2)
+        states = encoder_outputs[:-1]
 
         outputs = []
 
-        states = encoder_outputs[:-1]
- 
         for i in range(0, unroll_length):
 
             inp = mx.sym.expand_dims(inputs[i], axis=2)
@@ -219,11 +223,25 @@ def train_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unr
             probs = mx.sym.softmax(scores, axis=1)
             
             dec_in = mx.sym.batch_dot(attention, probs, transpose_a=True)
+           
+#            dec_in = mx.sym.FullyConnected(
+#                data=dec_in, weight=attention_fc_weight, bias=attention_fc_bias, num_hidden=args.num_hidden, name='attention_fc%d_' % i
+#            )
+            
             output, states = decoder(dec_in, states)
+
+#            print(output)
+#            node = probs # states[:-1][0] # inputs[i]
+#            arg_shapes, aux_shapes, out_shapes = node.infer_shape()
+#            print_inferred_shapes(node, arg_shapes, aux_shapes, out_shapes)
          
             outputs.append(output)
 
         outputs, _ = _normalize_sequence(unroll_length, outputs, layout, merge_outputs)
+
+#        node = inputs[:-1][0] # outputs # states[:-1][0] # inputs[i]
+#        arg_shapes, aux_shapes, out_shapes = node.infer_shape()
+#        print_inferred_shapes(node, arg_shapes, aux_shapes, out_shapes)
 
         return outputs, states
 
