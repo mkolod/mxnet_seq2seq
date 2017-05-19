@@ -224,8 +224,18 @@ def train_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unr
 #                dot = mx.sym.batch_dot(transposed, enc_out) 
                 dot = transposed * enc_out
 #                dot = mx.sym.broadcast_mul(transposed, enc_out, name='train_decoder_broadcast_mul%d_' % j)
-                sm = mx.sym.softmax(dot)
+
+#                sm = mx.sym.softmax(dot)
+                sm = mx.sym.exp(dot)
                 alignments.append(sm)
+
+            denom = alignments[0]
+
+            for j in range(1, len(encoder_outputs)):
+                denom += alignments[j]
+
+            for j in range(len(encoder_outputs)):
+                alignments[j] /= denom
 
 #            alignments = mx.sym.Group(alignments)
  
