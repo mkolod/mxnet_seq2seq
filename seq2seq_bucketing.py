@@ -203,29 +203,9 @@ def train_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unr
         states = begin_state
         outputs = []
 
-        embed = inputs[0]
-
-#        if len(encoder_outputs) > 1:
-#            states = [mx.sym.concat(*encoder_outputs, dim=1)]
-
-        # source: (batch_size, seq_len, encoder_num_hidden)
-#        source = states[0]
-       
-#        states = states[0]
         attention = mx.sym.expand_dims(states[0], axis=2)
  
-#        inputs = mx.sym.expand_dims(inputs, axis=2)
-
         for i in range(0, unroll_length):
-
-#            print("inputs:\n%s\n" % inputs[i])
-
-#            output, states = decoder(inputs[i], states)            
-
-        # source: (batch_size, seq_len, encoder_num_hidden)
-#            source = states[0]
-
-            print('i = %d' % i)
 
             inp = mx.sym.expand_dims(inputs[i], axis=2)
             inp = mx.sym.transpose(inp, axes=(0, 2, 1))
@@ -234,80 +214,9 @@ def train_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unr
             probs = mx.sym.softmax(scores, axis=1)
             
             dec_in = mx.sym.batch_dot(attention, probs, transpose_a=True)
-            dec_in = mx.sym.reshape(dec_in, shape=(0, 0))
-
             output, states = decoder(dec_in, states)
          
-            
-
-#            output = mx.sym.batch_dot(states, probs, transpose_a=True)
-#            output = mx.sym.reshape(output, shape=(0, 0))
-
-
-
             outputs.append(output)
-
-
-            # (batch_size, encoder_num_hidden)
-            # _attention_pooling(source, scores), states
-
-
-            # output, states = decoder(inputs[i], states)            
-
-
-            # axes=(0, 2, 1) 
-#           transposed = mx.sym.transpose(output, axes=(1, 0), name='train_decoder_transpose%d_' % i)
-#            transposed = mx.sym.expand_dims(output, axis=2)
-#            transposed = mx.sym.transpose(transposed, axes=(0, 2, 1), name='train_decoder_transpose%d_' % i)
-#            transposed = output
-
-#            alignments = []
-
-#            for j in range(len(encoder_outputs)):
-
-#                enc_out = encoder_outputs[j]
-
-#                enc_out = mx.sym.expand_dims(enc_out, axis=2)
-
-#                dot = mx.sym.batch_dot(transposed, enc_out, name='tran_decoder_unroll_batch_dot_%d_%d_' % (i, j))
-
-
-                 
-#                dot = transposed * enc_out
-                
-#                dot = mx.sym.broadcast_mul(transposed, enc_out, name='train_decoder_broadcast_mul%d_' % j)
-
-#                sm = mx.sym.softmax(dot)
-#                sm = mx.sym.exp(dot, name='train_decoder_unroll_exp_%d_%d' % (i, j))
-#                alignments.append(sm)
-
-#            denom = alignments[0]
-
-#            for j in range(1, len(encoder_outputs)):
-#                denom += alignments[j]
-
-#            for j in range(len(encoder_outputs)):
-#                alignments[j] /= denom
-
-#            alignments = mx.sym.Group(alignments)
- 
-#            weighted = mx.sym.broadcast_mul(encoder_outputs[0], alignments[0], name='train_decoder_unroll_mul%d_0_' % i)
-
-#            for j in range(1, len(encoder_outputs)):
-#                weighted += mx.sym.broadcast_mul(encoder_outputs[j],  alignments[j], name='train_decoder_mul_%d_%d_' % (i, j))
-
-            # list dimensions of inputs[i] and weighted
-                          
-#            concatenated = mx.sym.concat(inputs[i], weighted, name='train_decoder_unroll_concat%d_' % i)
-
-#            attention_fc = mx.sym.FullyConnected(
-#                data=concatenated, weight=attention_fc_weight, bias=attention_fc_bias, num_hidden=args.num_hidden, name='attention_fc%d_' % i
-#            )
-  
-#            att_tanh = mx.sym.Activation(data = attention_fc, act_type='tanh', name = 'attention_tanh%d_' % i)
-	    
-#            outputs.append(att_tanh)
-
 
         outputs, _ = _normalize_sequence(unroll_length, outputs, layout, merge_outputs)
 
