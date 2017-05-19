@@ -200,10 +200,14 @@ def train_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unr
         inputs, _ = _normalize_sequence(unroll_length, target_embed, layout, False)
 
         # Need to use hidden state from attention model, but <GO> as input
-        states = begin_state
+#        states = encoder_outputs[:-1]
+        states = mx.sym.concat(*encoder_outputs)  # begin_state
+#        states = encoder_outputs[:-1]
+
         outputs = []
 
         attention = mx.sym.expand_dims(states[0], axis=2)
+        states = encoder_outputs[:-1]
  
         for i in range(0, unroll_length):
 
