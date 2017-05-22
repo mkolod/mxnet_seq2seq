@@ -229,7 +229,7 @@ def train_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unr
                 
                 dot = mx.sym.batch_dot(transposed, curr_input, name='train_decoder_batch_dot_%d_%d_' % (i, j))
                 dot = mx.sym.exp(dot)
-                dot = mx.sym.split(dot, axis=2, num_outputs=1)
+                dot = mx.sym.reshape(dot, shape=(1, args.batch_size))
 
                 dots.append(dot)
                 if not concat_dots:
