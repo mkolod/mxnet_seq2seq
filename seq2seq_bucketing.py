@@ -203,41 +203,59 @@ def train_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unr
         states = begin_state
         outputs = []
 
-        embed = inputs[0]
+        attention_state = mx.sym.zeros_like(encoder_outputs[-1], name='train_dec_unroll_attention_state')
 
-        for i in range(0, unroll_length):
+        enc_len = len(encoder_outputs)
 
-            output, states = decoder(inputs[i], states)            
-            # axes=(0, 2, 1) 
-#           transposed = mx.sym.transpose(output, axes=(1, 0), name='train_decoder_transpose%d_' % i)
-#            transposed = mx.sym.expand_dims(output, axis=2)
-#            transposed = mx.sym.transpose(transposed, axes=(0, 2, 1), name='train_decoder_transpose%d_' % i)
-            transposed = output
+        for i in range(unroll_length):
 
-            alignments = []
-
-            for j in range(len(encoder_outputs)):
-
-                enc_out = encoder_outputs[j]
-#                enc_out = mx.sym.expand_dims(enc_out, axis=2)
-
-#                dot = mx.sym.batch_dot(transposed, enc_out) 
-                dot = transposed * enc_out
-#                dot = mx.sym.broadcast_mul(transposed, enc_out, name='train_decoder_broadcast_mul%d_' % j)
-                sm = mx.sym.softmax(dot)
-                alignments.append(sm)
-
-#            alignments = mx.sym.Group(alignments)
+            weighted_state = mx.sym.zeros_like(encoder_outputs[-1], name='train_dec_unroll_weighted_state_%d_' % i)
  
-            weighted = encoder_outputs[0] * alignments[0]
+#            align_weights = None 
 
-            for j in range(1, len(encoder_outputs)):
-                weighted += encoder_outputs[j] * alignments[j]
-                          
-            concatenated = mx.sym.concat(inputs[i], weighted)
+            curr_input = inputs[i]
+            curr_input = mx.sym.expand_dims(curr_input, axis=2, name='train_dec_unroll_expand_dims_%d_' % i)
+ 
+            dots = []
+            concat_dots = None
+
+            # loop over all the encoder periods to create weights for weighted state
+            for j in range(enc_len):
+
+#                transposed = mx.sym.transpose(encoder_outputs[j], axes=(1, 0), name='train_decoder_transpose%d_' % i)
+#                transposed = encoder_outputs[j]
+                transposed = mx.sym.expand_dims(encoder_outputs[j], axis=2)
+                transposed = mx.sym.transpose(transposed, axes=(0, 2, 1), name='train_decoder_transpose%d_' % i)
+                
+                dot = mx.sym.batch_dot(transposed, curr_input, name='train_decoder_batch_dot_%d_%d_' % (i, j))
+                dot = mx.sym.exp(dot)
+                dot = mx.sym.split(dot, axis=2, num_outputs=1)
+
+                dots.append(dot)
+                if not concat_dots:
+                    concat_dots = dot
+                else:
+                    concat_dots = mx.sym.concat(concat_dots, dot)
+
+            dot_sum = mx.sym.sum(concat_dots, axis = 1)
+
+            for j in range(enc_len):
+                curr_dot = mx.sym.transpose(dots[j])
+
+                attention_state += mx.sym.broadcast_mul(curr_dot, encoder_outputs[j], name='train_encoder_acc_attention_%d_%d_' % (i, j)) # / dot_sum
+                attention_state = mx.sym.broadcast_div(attention_state, dot_sum)
+
+ 
+#            arg_shapes, aux_shapes, out_shapes = attention_state.infer_shape()
+#            print_inferred_shapes(attention_state, arg_shapes, aux_shape, out_shapes)
+
+# def print_inferred_shapes(node, arg_shapes, aux_shapes, out_shapes):
+
+
+            concatenatted = mx.sym.concat(inputs[i], attention_state, name = 'train_decoder_concat_%d_' % i)
 
             attention_fc = mx.sym.FullyConnected(
-                data=concatenated, weight=attention_fc_weight, bias=attention_fc_bias, num_hidden=args.num_hidden, name='attention_fc%d_' % i
+                data=concatenatted, weight=attention_fc_weight, bias=attention_fc_bias, num_hidden=args.num_hidden, name='attention_fc%d_' % i
             )
   
             att_tanh = mx.sym.Activation(data = attention_fc, act_type='tanh', name = 'attention_tanh%d_' % i)
@@ -281,8 +299,6 @@ def infer_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unr
                 sm = mx.sym.softmax(dot)
             
                 alignments.append(sm)
-
-#            alignments = mx.sym.Group(alignments)
 
             weighted = encoder_outputs[0] * alignments[0]
 
