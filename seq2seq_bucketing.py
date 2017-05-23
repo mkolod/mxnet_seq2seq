@@ -241,7 +241,9 @@ def train_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unr
 
             attention_state = mx.sym.broadcast_div(attention_state, dot_sum)
 
-            concatenated = mx.sym.concat(inputs[i], attention_state, name = 'train_decoder_concat_%d_' % i)
+            dec_out, states = decoder(inputs[i], states)
+
+            concatenated = mx.sym.concat(dec_out, attention_state, name = 'train_decoder_concat_%d_' % i)
 
             attention_fc = mx.sym.FullyConnected(
                 data=concatenated, weight=attention_fc_weight, bias=attention_fc_bias, num_hidden=args.num_hidden, name='attention_fc%d_' % i
@@ -249,9 +251,7 @@ def train_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unr
   
             att_tanh = mx.sym.Activation(data = attention_fc, act_type='tanh', name = 'attention_tanh%d_' % i)
 
-            output, states = decoder(att_tanh, states)
-	    
-            outputs.append(output)
+            outputs.append(att_tanh)
 
         outputs, _ = _normalize_sequence(unroll_length, outputs, layout, merge_outputs)
 
