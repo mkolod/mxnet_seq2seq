@@ -248,9 +248,10 @@ def train_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unr
             )
   
             att_tanh = mx.sym.Activation(data = attention_fc, act_type='tanh', name = 'attention_tanh%d_' % i)
-	    
-            outputs.append(att_tanh)
 
+            output, states = decoder(att_tanh, states)
+	    
+            outputs.append(output)
 
         outputs, _ = _normalize_sequence(unroll_length, outputs, layout, merge_outputs)
 
