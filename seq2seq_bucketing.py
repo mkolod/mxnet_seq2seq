@@ -80,6 +80,10 @@ parser.add_argument('--seed', type=int, default=1234,
 parser.add_argument('--remove-state-feed', action='store_true',
                     help='Remove direct state feeding from encoder to decoder (use when using attention)')
 
+
+parser.add_argument('--input-feed', action='store_true',
+                    help='Enable input feed (attention is fed into the decoder as input, rather than concatenated with output)')
+
 #buckets = [32]
 # buckets = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
 
@@ -241,17 +245,30 @@ def train_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unr
 
             attention_state = mx.sym.broadcast_div(attention_state, dot_sum)
 
-            dec_out, states = decoder(inputs[i], states)
 
-            concatenated = mx.sym.concat(dec_out, attention_state, name = 'train_decoder_concat_%d_' % i)
+            if args.input_feed:
 
-            attention_fc = mx.sym.FullyConnected(
-                data=concatenated, weight=attention_fc_weight, bias=attention_fc_bias, num_hidden=args.num_hidden, name='attention_fc%d_' % i
-            )
+                concatenated = mx.sym.concat(inputs[i], attention_state, name = 'train_decoder_concatt_%d_' % i)
+                attention_fc = mx.sym.FullyConnected(
+                    data = concatenated, weight=attention_fc_weight, bias=attention_fc_bias, num_hidden=args.num_hidden, name='attention_fc%d_' % i
+                )
+                att_tanh = mx.sym.Activation(data = attention_fc, act_type='tanh', name = 'attention_tanh%d_' % i)
+                dec_out, states = decoder(att_tanh, states)
+                outputs.append(dec_out)
+
+            else:
+                dec_out, states = decoder(inputs[i], states)
+
+                # Should this be dec_out or states as the first argument? 
+                concatenated = mx.sym.concat(dec_out, attention_state, name = 'train_decoder_concat_%d_' % i)
+
+                attention_fc = mx.sym.FullyConnected(
+                    data=concatenated, weight=attention_fc_weight, bias=attention_fc_bias, num_hidden=args.num_hidden, name='attention_fc%d_' % i
+                )
   
-            att_tanh = mx.sym.Activation(data = attention_fc, act_type='tanh', name = 'attention_tanh%d_' % i)
+                att_tanh = mx.sym.Activation(data = attention_fc, act_type='tanh', name = 'attention_tanh%d_' % i)
 
-            outputs.append(att_tanh)
+                outputs.append(att_tanh)
 
         outputs, _ = _normalize_sequence(unroll_length, outputs, layout, merge_outputs)
 
