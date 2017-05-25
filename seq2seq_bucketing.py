@@ -246,34 +246,42 @@ def train_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unr
             attention_state = mx.sym.broadcast_div(attention_state, dot_sum)
 
 
-            if args.input_feed:
+#            if args.input_feed:
 
                 # This is wrong !!!
                 # First produce the attentional output like in the else part (after tanh).
                 # Then feed this entire output together with input embedding as a concat state.
                 # See p. 5 here: https://arxiv.org/pdf/1508.04025.pdf
 
-                concatenated = mx.sym.concat(inputs[i], attention_state, name = 'train_decoder_concatt_%d_' % i)
-                attention_fc = mx.sym.FullyConnected(
-                    data = concatenated, weight=attention_fc_weight, bias=attention_fc_bias, num_hidden=args.num_hidden, name='attention_fc%d_' % i
-                )
-                att_tanh = mx.sym.Activation(data = attention_fc, act_type='tanh', name = 'attention_tanh%d_' % i)
-                dec_out, states = decoder(att_tanh, states)
-                outputs.append(dec_out)
+               
+#                concatenated = mx.sym.concat(inputs[i], attention_state, name = 'train_decoder_concatt_%d_' % i)
+#                attention_fc = mx.sym.FullyConnected(
+#                    data = concatenated, weight=attention_fc_weight, bias=attention_fc_bias, num_hidden=args.num_hidden, name='attention_fc%d_' % i
+#                )
+#                att_tanh = mx.sym.Activation(data = attention_fc, act_type='tanh', name = 'attention_tanh%d_' % i)
+#                dec_out, states = decoder(att_tanh, states)
+#                outputs.append(dec_out)
 
+            if i == 0:
+                att_tanh = inputs[0]
+
+            if args.input_feed:
+                decoder_feed = mx.sym.concat(inputs[i], att_tanh, name = 'decoder_feed_concat_%d_' % i)
             else:
-                dec_out, states = decoder(inputs[i], states)
+                decoder_feed = inputs[i]
+ 
+            dec_out, states = decoder(decoder_feed, states)
 
-                # Should this be dec_out or states as the first argument? 
-                concatenated = mx.sym.concat(dec_out, attention_state, name = 'train_decoder_concat_%d_' % i)
+            # Should this be dec_out or states as the first argument? 
+            concatenated = mx.sym.concat(dec_out, attention_state, name = 'train_decoder_concat_%d_' % i)
 
-                attention_fc = mx.sym.FullyConnected(
-                    data=concatenated, weight=attention_fc_weight, bias=attention_fc_bias, num_hidden=args.num_hidden, name='attention_fc%d_' % i
-                )
+            attention_fc = mx.sym.FullyConnected(
+                data=concatenated, weight=attention_fc_weight, bias=attention_fc_bias, num_hidden=args.num_hidden, name='attention_fc%d_' % i
+            )
   
-                att_tanh = mx.sym.Activation(data = attention_fc, act_type='tanh', name = 'attention_tanh%d_' % i)
+            att_tanh = mx.sym.Activation(data = attention_fc, act_type='tanh', name = 'attention_tanh%d_' % i)
 
-                outputs.append(att_tanh)
+            outputs.append(att_tanh)
 
         outputs, _ = _normalize_sequence(unroll_length, outputs, layout, merge_outputs)
 
