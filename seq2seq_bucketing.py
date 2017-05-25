@@ -248,6 +248,11 @@ def train_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unr
 
             if args.input_feed:
 
+                # This is wrong !!!
+                # First produce the attentional output like in the else part (after tanh).
+                # Then feed this entire output together with input embedding as a concat state.
+                # See p. 5 here: https://arxiv.org/pdf/1508.04025.pdf
+
                 concatenated = mx.sym.concat(inputs[i], attention_state, name = 'train_decoder_concatt_%d_' % i)
                 attention_fc = mx.sym.FullyConnected(
                     data = concatenated, weight=attention_fc_weight, bias=attention_fc_bias, num_hidden=args.num_hidden, name='attention_fc%d_' % i
