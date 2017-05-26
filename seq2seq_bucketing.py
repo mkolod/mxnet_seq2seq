@@ -215,8 +215,10 @@ def train_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unr
                 transposed = mx.sym.expand_dims(encoder_outputs[j], axis=2)
                 transposed = mx.sym.transpose(transposed, axes=(0, 2, 1), name='train_decoder_transpose%d_' % i)
                 dot = mx.sym.batch_dot(transposed, curr_input, name='train_decoder_batch_dot_%d_%d_' % (i, j))
-                dot = mx.sym.exp(dot)
-                dot = mx.sym.reshape(dot, shape=(1, args.batch_size))
+                dot = mx.sym.exp(dot, name='train_decoder_exp_%d_%d' % (i, j))
+                # The batch size shouldn't be an arg here anyway. We should just remove extra dimensions
+                # and then transpose.
+                dot = mx.sym.reshape(dot, shape=(1, args.batch_size / len(contexts)), name='train_decoder_unroll_reshape_%d_%d' % (i, j))
                 dots.append(dot)
                 if not concat_dots:
                     concat_dots = dot
