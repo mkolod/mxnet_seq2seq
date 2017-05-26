@@ -208,11 +208,8 @@ def train_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unr
         attention_state = mx.sym.zeros_like(encoder_outputs[-1], name='train_dec_unroll_attention_state')
         enc_len = len(encoder_outputs)
         for i in range(unroll_length):
-#            curr_input = inputs[i]
-#            curr_input = mx.sym.expand_dims(curr_input, axis=2, name='train_dec_unroll_expand_dims_%d_' % i)
-
             if i == 0:
-                curr_att_input = mx.sym.zeros_like(states[-1])
+                curr_att_input = mx.sym.zeros_like(states[-1]) # states[-1]
             else:
                 curr_att_input = curr_out
             curr_att_input = mx.sym.expand_dims(curr_att_input, axis=2, name='train_dec_unroll_expand_dims_%d_' % i)
@@ -239,10 +236,10 @@ def train_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unr
                 attention_state += mx.sym.broadcast_mul(curr_dot, encoder_outputs[j], name='train_encoder_acc_attention_%d_%d_' % (i, j))
 
             attention_state = mx.sym.broadcast_div(attention_state, dot_sum)
-            if i == 0:
-                att_tanh = inputs[0]
             if args.input_feed:
-                decoder_feed = mx.sym.concat(inputs[i], att_tanh, name = 'decoder_feed_concat_%d_' % i)
+                if i == 0:
+                    curr_out = inputs[0]
+                decoder_feed = mx.sym.concat(inputs[i], curr_out, name = 'decoder_feed_concat_%d_' % i)
             else:
                 decoder_feed = inputs[i]
             dec_out, states = decoder(decoder_feed, states)
