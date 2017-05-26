@@ -208,16 +208,22 @@ def train_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unr
         attention_state = mx.sym.zeros_like(encoder_outputs[-1], name='train_dec_unroll_attention_state')
         enc_len = len(encoder_outputs)
         for i in range(unroll_length):
-            weighted_state = mx.sym.zeros_like(encoder_outputs[-1], name='train_dec_unroll_weighted_state_%d_' % i)
-            curr_input = inputs[i]
-            curr_input = mx.sym.expand_dims(curr_input, axis=2, name='train_dec_unroll_expand_dims_%d_' % i)
+#            curr_input = inputs[i]
+#            curr_input = mx.sym.expand_dims(curr_input, axis=2, name='train_dec_unroll_expand_dims_%d_' % i)
+
+            if i == 0:
+                curr_att_input = mx.sym.zeros_like(states[-1])
+            else:
+                curr_att_input = curr_out
+            curr_att_input = mx.sym.expand_dims(curr_att_input, axis=2, name='train_dec_unroll_expand_dims_%d_' % i)
+
             dots = []
             concat_dots = None
             # loop over all the encoder periods to create weights for weighted state
             for j in range(enc_len):
                 transposed = mx.sym.expand_dims(encoder_outputs[j], axis=2)
                 transposed = mx.sym.transpose(transposed, axes=(0, 2, 1), name='train_decoder_transpose%d_' % i)
-                dot = mx.sym.batch_dot(transposed, curr_input, name='train_decoder_batch_dot_%d_%d_' % (i, j))
+                dot = mx.sym.batch_dot(transposed, curr_att_input, name='train_decoder_batch_dot_%d_%d_' % (i, j))
                 dot = mx.sym.exp(dot, name='train_decoder_exp_%d_%d' % (i, j))
                 # The batch size shouldn't be an arg here anyway. We should just remove extra dimensions
                 # and then transpose.
@@ -270,7 +276,6 @@ def infer_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unr
         attention_state = mx.sym.zeros_like(encoder_outputs[-1], name='train_dec_unroll_attention_state')
         enc_len = len(encoder_outputs)
         for i in range(unroll_length):
-            weighted_state = mx.sym.zeros_like(encoder_outputs[-1], name='train_dec_unroll_weighted_state_%d_' % i)
             curr_input = inputs[i]
             curr_input = mx.sym.expand_dims(curr_input, axis=2, name='train_dec_unroll_expand_dims_%d_' % i)
             dots = []
