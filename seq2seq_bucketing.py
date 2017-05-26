@@ -19,7 +19,7 @@ from utils import array_to_text, tokenize_text, invert_dict, get_s2s_data, Datas
 
 from seq2seq_iterator import *
 
-from attention_cell import AttentionEncoderCell, DotAttentionCell
+# from attention_cell import AttentionEncoderCell, DotAttentionCell
 
 parser = argparse.ArgumentParser(description="Train RNN on Penn Tree Bank",
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -83,6 +83,9 @@ parser.add_argument('--remove-state-feed', action='store_true',
 
 parser.add_argument('--input-feed', action='store_true',
                     help='Enable input feed (attention is fed into the decoder as input, rather than concatenated with output)')
+
+parser.add_argument('--attention', action='store_true',
+                    help='Use attention (dot attention is the currently implemented form')
 
 #buckets = [32]
 # buckets = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
@@ -237,13 +240,16 @@ def train_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unr
             else:
                 decoder_feed = inputs[i]
             dec_out, states = decoder(decoder_feed, states)
-            # Should this be dec_out or states as the first argument? 
-            concatenated = mx.sym.concat(dec_out, attention_state, name = 'train_decoder_concat_%d_' % i)
-            attention_fc = mx.sym.FullyConnected(
-                data=concatenated, weight=attention_fc_weight, bias=attention_fc_bias, num_hidden=args.num_hidden, name='attention_fc%d_' % i
-            )
-            att_tanh = mx.sym.Activation(data = attention_fc, act_type='tanh', name = 'attention_tanh%d_' % i)
-            outputs.append(att_tanh)
+            if args.attention:
+                # Should this be dec_out or states as the first argument? 
+                concatenated = mx.sym.concat(dec_out, attention_state, name = 'train_decoder_concat_%d_' % i)
+                attention_fc = mx.sym.FullyConnected(
+                    data=concatenated, weight=attention_fc_weight, bias=attention_fc_bias, num_hidden=args.num_hidden, name='attention_fc%d_' % i
+                )
+                curr_out = mx.sym.Activation(data = attention_fc, act_type='tanh', name = 'attention_tanh%d_' % i)
+            else:
+                curr_out = dec_out
+            outputs.append(curr_out)
         outputs, _ = _normalize_sequence(unroll_length, outputs, layout, merge_outputs)
         return outputs, states
 
@@ -294,15 +300,17 @@ def infer_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unr
             else:
                 decoder_feed = inputs[i]
             dec_out, states = decoder(decoder_feed, states)
-            # Should this be dec_out or states as the first argument? 
-            concatenated = mx.sym.concat(dec_out, attention_state, name = 'train_decoder_concat_%d_' % i)
-            attention_fc = mx.sym.FullyConnected(
-                data=concatenated, weight=attention_fc_weight, bias=attention_fc_bias, num_hidden=args.num_hidden, name='attention_fc%d_' % i
-            )
-            att_tanh = mx.sym.Activation(data = attention_fc, act_type='tanh', name = 'attention_tanh%d_' % i)
-            outputs.append(att_tanh)
-
-            fc = mx.sym.FullyConnected(data=att_tanh, weight=fc_weight, bias=fc_bias, num_hidden=len(targ_vocab), name='decoder_fc%d_'%i)
+            # Should this be dec_out or states as the first argument?
+            if args.attention: 
+                concatenated = mx.sym.concat(dec_out, attention_state, name = 'train_decoder_concat_%d_' % i)
+                attention_fc = mx.sym.FullyConnected(
+                    data=concatenated, weight=attention_fc_weight, bias=attention_fc_bias, num_hidden=args.num_hidden, name='attention_fc%d_' % i
+                )
+                curr_out = mx.sym.Activation(data = attention_fc, act_type='tanh', name = 'attention_tanh%d_' % i)
+            else:
+                curr_out = dec_out
+            outputs.append(curr_out)
+            fc = mx.sym.FullyConnected(data=curr_out, weight=fc_weight, bias=fc_bias, num_hidden=len(targ_vocab), name='decoder_fc%d_'%i)
             am = mx.sym.argmax(data=fc, axis=1)
             embed = mx.sym.Embedding(data=am, weight=targ_em_weight, input_dim=len(targ_vocab), output_dim=args.num_embed, name='decoder_embed%d_'%i)
 
