@@ -261,7 +261,6 @@ def infer_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unr
         outputs = []
         embed = inputs[0]
 
-#########################################################################################################################
         attention_state = mx.sym.zeros_like(encoder_outputs[-1], name='train_dec_unroll_attention_state')
         enc_len = len(encoder_outputs)
         for i in range(unroll_length):
@@ -276,7 +275,7 @@ def infer_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unr
                 transposed = mx.sym.transpose(transposed, axes=(0, 2, 1), name='train_decoder_transpose%d_' % i)
                 dot = mx.sym.batch_dot(transposed, curr_input, name='train_decoder_batch_dot_%d_%d_' % (i, j))
                 dot = mx.sym.exp(dot)
-                dot = mx.sym.reshape(dot, shape=(1, args.batch_size))
+                dot = mx.sym.reshape(dot, shape=(1, args.batch_size / len(contexts)))
                 dots.append(dot)
                 if not concat_dots:
                     concat_dots = dot
@@ -309,8 +308,6 @@ def infer_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unr
 
         outputs, _ = _normalize_sequence(unroll_length, outputs, layout, merge_outputs)
         return outputs, states
-
-#########################################################################################################################
 
 #        for i in range(0, unroll_length):
 #            output, states = decoder(embed, states)
