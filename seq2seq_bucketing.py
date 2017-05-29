@@ -194,153 +194,121 @@ def get_data(layout, infer=False):
     else:
         return test_iter, test_iter.src_vocab, test_iter.inv_src_vocab, test_iter.targ_vocab, test_iter.inv_targ_vocab
 
+def attention_step(i, encoder_outputs, decoder_output):
+
+    attention_state = mx.sym.zeros_like(encoder_outputs[-1], name='train_dec_unroll_attention_state')
+    curr_att_input = mx.sym.expand_dims(decoder_output, axis=2, name='train_dec_unroll_expand_dims_%d_' % i)
+    enc_len = len(encoder_outputs)
+    dots = []
+    concat_dots = None
+    # loop over all the encoder periods to create weights for weighted state
+    for j in range(enc_len):
+        transposed = mx.sym.expand_dims(encoder_outputs[j], axis=2)
+        transposed = mx.sym.transpose(transposed, axes=(0, 2, 1), name='train_decoder_transpose%d_' % i)
+        dot = mx.sym.batch_dot(transposed, curr_att_input, name='train_decoder_batch_dot_%d_%d_' % (i, j))
+        dot = mx.sym.exp(dot, name='train_decoder_exp_%d_%d' % (i, j))
+        # The batch size shouldn't be an arg here anyway. We should just remove extra dimensions
+        # and then transpose.
+        dot = mx.sym.reshape(dot, shape=(1, args.batch_size / len(contexts)),
+                             name='train_decoder_unroll_reshape_%d_%d' % (i, j))
+        dots.append(dot)
+        if not concat_dots:
+            concat_dots = dot
+        else:
+            concat_dots = mx.sym.concat(concat_dots, dot)
+    dot_sum = mx.sym.sum(concat_dots, axis=1)
+    for j in range(enc_len):
+        curr_dot = mx.sym.transpose(dots[j])
+        attention_state += mx.sym.broadcast_mul(curr_dot, encoder_outputs[j],
+                                                name='train_encoder_acc_attention_%d_%d_' % (i, j))
+
+    attention_state = mx.sym.broadcast_div(attention_state, dot_sum)
+
+    return attention_state
+
 
 def train_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unroll_length,
-                  go_symbol, fc_weight, fc_bias, attention_fc_weight, attention_fc_bias, targ_em_weight,
-                  begin_state=None, layout='TNC', merge_outputs=None):
-        decoder.reset()
-        if begin_state is None:
-            begin_state = decoder.begin_state()
-        inputs, _ = _normalize_sequence(unroll_length, target_embed, layout, False)
-        # Need to use hidden state from attention model, but <GO> as input
-        states = begin_state
-        outputs = []
-        enc_len = len(encoder_outputs)
-	attention_state = None
-        for i in range(unroll_length):
-            if args.input_feed:
-                prev_attention_state = attention_state if attention_state else mx.sym.zeros_like(encoder_outputs[-1], name='train_dec_unroll_prev_attention_state')
-	    attention_state = mx.sym.zeros_like(encoder_outputs[-1], name='train_dec_unroll_attention_state')
-	    if args.input_feed:
-                decoder_feed = mx.sym.concat(inputs[i], prev_attention_state, name = 'decoder_feed_concat_%d_' % i)
-            else:
-                decoder_feed = inputs[i]
-            dec_out, states = decoder(decoder_feed, states)
+                         go_symbol, fc_weight, fc_bias, attention_fc_weight, attention_fc_bias, targ_em_weight,
+                        begin_state=None, layout='TNC', merge_outputs=None):
+    decoder.reset()
+    if begin_state is None:
+        begin_state = decoder.begin_state()
+    inputs, _ = _normalize_sequence(unroll_length, target_embed, layout, False)
+    # Need to use hidden state from attention model, but <GO> as input
+    states = begin_state
+    outputs = []
 
-            curr_att_input = mx.sym.expand_dims(dec_out, axis=2, name='train_dec_unroll_expand_dims_%d_' % i)
+    #At the first time step there is no previous attention
+    attention_state = None
 
-            dots = []
-            concat_dots = None
-            # loop over all the encoder periods to create weights for weighted state
-            for j in range(enc_len):
-                transposed = mx.sym.expand_dims(encoder_outputs[j], axis=2)
-                transposed = mx.sym.transpose(transposed, axes=(0, 2, 1), name='train_decoder_transpose%d_' % i)
-                dot = mx.sym.batch_dot(transposed, curr_att_input, name='train_decoder_batch_dot_%d_%d_' % (i, j))
-                dot = mx.sym.exp(dot, name='train_decoder_exp_%d_%d' % (i, j))
-                # The batch size shouldn't be an arg here anyway. We should just remove extra dimensions
-                # and then transpose.
-                dot = mx.sym.reshape(dot, shape=(1, args.batch_size / len(contexts)), name='train_decoder_unroll_reshape_%d_%d' % (i, j))
-                dots.append(dot)
-                if not concat_dots:
-                    concat_dots = dot
-                else:
-                    concat_dots = mx.sym.concat(concat_dots, dot)
-            dot_sum = mx.sym.sum(concat_dots, axis = 1)
-            for j in range(enc_len):
-                curr_dot = mx.sym.transpose(dots[j])
-                attention_state += mx.sym.broadcast_mul(curr_dot, encoder_outputs[j], name='train_encoder_acc_attention_%d_%d_' % (i, j))
+    for i in range(unroll_length):
+        if args.input_feed:
+            # Copy previous attention output to concatenate with the embedding input
+            prev_attention_state = attention_state if attention_state else mx.sym.zeros_like(encoder_outputs[-1], name='train_dec_unroll_prev_attention_state')
+            decoder_feed = mx.sym.concat(inputs[i], prev_attention_state, name = 'decoder_feed_concat_%d_' % i)
+        else:
+            decoder_feed = inputs[i]
+        dec_out, states = decoder(decoder_feed, states)
 
-            attention_state = mx.sym.broadcast_div(attention_state, dot_sum)
-            if args.attention:
-                # Should this be dec_out or states as the first argument? 
-                concatenated = mx.sym.concat(dec_out, attention_state, name = 'train_decoder_concat_%d_' % i)
-                attention_fc = mx.sym.FullyConnected(
-                    data=concatenated, weight=attention_fc_weight, bias=attention_fc_bias, num_hidden=args.num_hidden, name='attention_fc%d_' % i
-                )
-                curr_out = mx.sym.Activation(data = attention_fc, act_type='tanh', name = 'attention_tanh%d_' % i)
-            else:
-                curr_out = dec_out
-            outputs.append(curr_out)
-        outputs, _ = _normalize_sequence(unroll_length, outputs, layout, merge_outputs)
-        return outputs, states
+        if args.attention:
+            # The attention receives as input all the encoder outputs and the current decoder output and return the vector
+            # for this time step
+            attention_state = attention_step(i, encoder_outputs, dec_out)
+            # The attention output is combined with the decoder output for computing the next word
+            concatenated = mx.sym.concat(dec_out, attention_state, name = 'train_decoder_concat_%d_' % i)
+            attention_fc = mx.sym.FullyConnected(
+                data=concatenated, weight=attention_fc_weight, bias=attention_fc_bias, num_hidden=args.num_hidden, name='attention_fc%d_' % i
+            )
+            curr_out = mx.sym.Activation(data = attention_fc, act_type='tanh', name = 'attention_tanh%d_' % i)
+        else:
+            # We avoid all the attention computation
+            curr_out = dec_out
+        outputs.append(curr_out)
+    outputs, _ = _normalize_sequence(unroll_length, outputs, layout, merge_outputs)
+    return outputs, states
 
-# This requires a rewrite now that we're adding attention. 
-# See the pre-attention version for hints.
+
 def infer_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unroll_length,
                   go_symbol, fc_weight, fc_bias, attention_fc_weight, attention_fc_bias, targ_em_weight,
                   begin_state=None, layout='TNC', merge_outputs=None):
-        decoder.reset()
-        if begin_state is None:
-            begin_state = decoder.begin_state()
-        inputs, _ = _normalize_sequence(unroll_length, target_embed, layout, False)
-        # Need to use hidden state from attention model, but <GO> as input
-        states = begin_state
-        outputs = []
-        embed = inputs[0]
+    decoder.reset()
+    if begin_state is None:
+        begin_state = decoder.begin_state()
+    inputs, _ = _normalize_sequence(unroll_length, target_embed, layout, False)
+    # Need to use hidden state from attention model, but <GO> as input
+    states = begin_state
+    outputs = []
+    embed = inputs[0]
 
-        attention_state = mx.sym.zeros_like(encoder_outputs[-1], name='train_dec_unroll_attention_state')
-        enc_len = len(encoder_outputs)
+    attention_state = None
 
-        for i in range(unroll_length):
+    for i in range(unroll_length):
+        if args.input_feed:
+            # Copy previous attention output to concatenate with the embedding input
+            prev_attention_state = attention_state if attention_state else mx.sym.zeros_like(encoder_outputs[-1],
+                                        name='train_dec_unroll_prev_attention_state')
+            decoder_feed = mx.sym.concat(embed, prev_attention_state, name='decoder_feed_concat_%d_' % i)
+        else:
+            decoder_feed = embed
+        dec_out, states = decoder(decoder_feed, states)
 
-            if i == 0:
-#                if args.remove_state_feed:
-                curr_att_input = mx.sym.zeros_like(states[-1])
-#                else:
-#                curr_att_input = states[-1]
-            else:
-                curr_att_input = curr_out
-            curr_att_input = mx.sym.expand_dims(curr_att_input, axis=2, name='train_dec_unroll_expand_dims_%d_' % i)
+        # Should this be dec_out or states as the first argument?
+        if args.attention:
+            attention_state = attention_step(i, encoder_outputs, dec_out)
+            concatenated = mx.sym.concat(dec_out, attention_state, name = 'train_decoder_concat_%d_' % i)
+            attention_fc = mx.sym.FullyConnected(
+                data=concatenated, weight=attention_fc_weight, bias=attention_fc_bias, num_hidden=args.num_hidden, name='attention_fc%d_' % i
+            )
+            curr_out = mx.sym.Activation(data = attention_fc, act_type='tanh', name = 'attention_tanh%d_' % i)
+        else:
+            curr_out = dec_out
+        outputs.append(curr_out)
+        fc = mx.sym.FullyConnected(data=curr_out, weight=fc_weight, bias=fc_bias, num_hidden=len(targ_vocab), name='decoder_fc%d_'%i)
+        am = mx.sym.argmax(data=fc, axis=1)
+        embed = mx.sym.Embedding(data=am, weight=targ_em_weight, input_dim=len(targ_vocab), output_dim=args.num_embed, name='decoder_embed%d_'%i)
 
-#            curr_input = inputs[i]
-#            curr_input = mx.sym.expand_dims(curr_input, axis=2, name='train_dec_unroll_expand_dims_%d_' % i)
-
-            dots = []
-            concat_dots = None
-
-            # loop over all the encoder periods to create weights for weighted state
-            for j in range(enc_len):
-                transposed = mx.sym.expand_dims(encoder_outputs[j], axis=2)
-                transposed = mx.sym.transpose(transposed, axes=(0, 2, 1), name='train_decoder_transpose%d_' % i)
-                dot = mx.sym.batch_dot(transposed, curr_att_input, name='train_decoder_batch_dot_%d_%d_' % (i, j))
-                dot = mx.sym.exp(dot)
-                dot = mx.sym.reshape(dot, shape=(1, args.batch_size / len(contexts)))
-                dots.append(dot)
-                if not concat_dots:
-                    concat_dots = dot
-                else:
-                    concat_dots = mx.sym.concat(concat_dots, dot)
-            dot_sum = mx.sym.sum(concat_dots, axis = 1)
-            for j in range(enc_len):
-                curr_dot = mx.sym.transpose(dots[j])
-                attention_state += mx.sym.broadcast_mul(curr_dot, encoder_outputs[j], name='train_encoder_acc_attention_%d_%d_' % (i, j))
-
-            attention_state = mx.sym.broadcast_div(attention_state, dot_sum)
-            if i == 0:
-                att_tanh = embed
-            if args.input_feed:
-                decoder_feed = mx.sym.concat(embed, curr_out, name = 'decoder_feed_concat_%d_' % i)
-            else:
-                decoder_feed = inputs[i]
-            dec_out, states = decoder(decoder_feed, states)
-            # Should this be dec_out or states as the first argument?
-            if args.attention: 
-                concatenated = mx.sym.concat(dec_out, attention_state, name = 'train_decoder_concat_%d_' % i)
-                attention_fc = mx.sym.FullyConnected(
-                    data=concatenated, weight=attention_fc_weight, bias=attention_fc_bias, num_hidden=args.num_hidden, name='attention_fc%d_' % i
-                )
-                curr_out = mx.sym.Activation(data = attention_fc, act_type='tanh', name = 'attention_tanh%d_' % i)
-            else:
-                curr_out = dec_out
-            outputs.append(curr_out)
-            fc = mx.sym.FullyConnected(data=curr_out, weight=fc_weight, bias=fc_bias, num_hidden=len(targ_vocab), name='decoder_fc%d_'%i)
-            am = mx.sym.argmax(data=fc, axis=1)
-            embed = mx.sym.Embedding(data=am, weight=targ_em_weight, input_dim=len(targ_vocab), output_dim=args.num_embed, name='decoder_embed%d_'%i)
-
-        outputs, _ = _normalize_sequence(unroll_length, outputs, layout, merge_outputs)
-        return outputs, states
-
-#        for i in range(0, unroll_length):
-#            output, states = decoder(embed, states)
-#            outputs.append(output)
-#            fc = mx.sym.FullyConnected(data=output, weight=fc_weight, bias=fc_bias, num_hidden=len(targ_vocab), name='decoder_fc%d_'%i)
-#            am = mx.sym.argmax(data=fc, axis=1)
-#            embed = mx.sym.Embedding(data=am, weight=targ_em_weight, input_dim=len(targ_vocab),
-#                output_dim=args.num_embed, name='decoder_embed%d_'%i)
-#
-#        outputs, _ = _normalize_sequence(unroll_length, outputs, layout, merge_outputs)
-#
-#        return outputs, states
+    outputs, _ = _normalize_sequence(unroll_length, outputs, layout, merge_outputs)
+    return outputs, states
 
 def train(args):
 
@@ -714,6 +682,9 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG, format=head)
 
     args = parser.parse_args()
+
+    if args.input_feed:
+        assert (args.attention == True), "--input-feed is legal only with --attention!"
 
     # set random seeds for Python, NumPy and MxNet
     import random
