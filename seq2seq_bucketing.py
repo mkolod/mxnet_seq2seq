@@ -6,7 +6,7 @@ import cPickle as pickle
 import math
 import nltk
 
-from mxnet.rnn import LSTMCell, SequentialRNNCell, FusedRNNCell
+from mxnet.rnn import LSTMCell, SequentialRNNCell, FusedRNNCell, BidirectionalCell
 #from rnn_cell import LSTMCell, SequentialRNNCell
 from itertools import takewhile, dropwhile
 from operator import itemgetter
@@ -35,7 +35,7 @@ parser.add_argument('--num-hidden', type=int, default=200,
                     help='hidden layer size')
 parser.add_argument('--num-embed', type=int, default=200,
                     help='embedding layer size')
-parser.add_argument('--bidirectional', type=bool, default=False,
+parser.add_argument('--bidirectional', action='store_true',
                     help='whether to use bidirectional layers')
 parser.add_argument('--gpus', type=str,
                     help='list of gpus to run, e.g. 0 or 0,2,5. empty means using cpu. ' \
@@ -331,10 +331,18 @@ def train(args):
             mode='lstm', prefix='lstm_encoder', bidirectional=args.bidirectional, get_next_state=True))
     else:
         for i in range(args.num_layers):
-            encoder.add(LSTMCell(args.num_hidden, prefix='rnn_encoder%d_' % i))
-            if i < args.num_layers - 1 and args.dropout > 0.0:
-                encoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_encoder%d_' % i))
-#    encoder.add(AttentionEncoderCell())
+            if args.bidirectional:
+                encoder.add(
+                    BidirectionalCell(
+                        LSTMCell(args.num_hidden // 2, prefix='rnn_encoder_f%d_' % i),
+                        LSTMCell(args.num_hidden // 2, prefix='rnn_encoder_b%d_' % i)))
+                if i < args.num_layers - 1 and args.dropout > 0.0:
+                    encoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_encoder%d_' % i))
+            else:
+                encoder.add(
+                    LSTMCell(args.num_hidden, prefix='rnn_encoder%d_' % i))
+                if i < args.num_layers - 1 and args.dropout > 0.0:
+                    encoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_encoder%d_' % i))
 
     decoder = mx.rnn.SequentialRNNCell()
 
@@ -346,7 +354,6 @@ def train(args):
             decoder.add(LSTMCell(args.num_hidden, prefix=('rnn_decoder%d_' % i)))
             if i < args.num_layers - 1 and args.dropout > 0.0:
                 decoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_decoder%d_' % i))
-#    decoder.add(DotAttentionCell())
 
     def sym_gen(seq_len):
         src_data = mx.sym.Variable('src_data')
@@ -379,8 +386,6 @@ def train(args):
             outputs, _ = train_decoder_unroll(decoder, encoder_outputs, targ_embed, targ_vocab, dec_seq_len, 0, fc_weight, fc_bias,
                              attention_fc_weight, attention_fc_bias, 
                              targ_em_weight, begin_state=encoder_states, layout='TNC', merge_outputs=True)
-
-#            outputs, _ = decoder.unroll(dec_seq_len, targ_embed, begin_state=encoder_states, layout=layout, merge_outputs=True)
 
         # NEW
         rs = mx.sym.Reshape(outputs, shape=(-1, args.num_hidden), name='sym_gen_reshape1')
@@ -513,11 +518,18 @@ def infer(args):
         encoder = SequentialRNNCell()
 
         for i in range(args.num_layers):
-            encoder.add(LSTMCell(args.num_hidden, prefix='rnn_encoder%d_' % i))
-            if i < args.num_layers - 1 and args.dropout > 0.0:
-                encoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_encoder%d_' % i))
-
-#    encoder.add(AttentionEncoderCell())
+            if args.bidirectional:
+                encoder.add(
+                    BidirectionalCell(
+                        LSTMCell(args.num_hidden // 2, prefix='rnn_encoder_f%d_' % i),
+                        LSTMCell(args.num_hidden // 2, prefix='rnn_encoder_b%d_' % i)))
+                if i < args.num_layers - 1 and args.dropout > 0.0:
+                    encoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_encoder%d_' % i))
+            else:
+                encoder.add(
+                    LSTMCell(args.num_hidden, prefix='rnn_encoder%d_' % i))
+                if i < args.num_layers - 1 and args.dropout > 0.0:
+                    encoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_encoder%d_' % i))
 
     if args.use_cudnn_cells:
         decoder = mx.rnn.FusedRNNCell(args.num_hidden, num_layers=args.num_layers, 
@@ -530,8 +542,6 @@ def infer(args):
             decoder.add(LSTMCell(args.num_hidden, prefix=('rnn_decoder%d_' % i)))
             if i < args.num_layers - 1 and args.dropout > 0.0:
                 decoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_decoder%d_' % i))
-
-#    decoder.add(DotAttentionCell())
 
     def sym_gen(seq_len):
         src_data = mx.sym.Variable('src_data')
