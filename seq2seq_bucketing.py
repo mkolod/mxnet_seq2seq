@@ -6,7 +6,7 @@ import cPickle as pickle
 import math
 import nltk
 
-from mxnet.rnn import LSTMCell, SequentialRNNCell, FusedRNNCell
+from mxnet.rnn import LSTMCell, SequentialRNNCell, FusedRNNCell, BidirectionalCell
 #from rnn_cell import LSTMCell, SequentialRNNCell
 from itertools import takewhile, dropwhile
 from operator import itemgetter
@@ -19,7 +19,7 @@ from utils import array_to_text, tokenize_text, invert_dict, get_s2s_data, Datas
 
 from seq2seq_iterator import *
 
-from attention_cell import AttentionEncoderCell, DotAttentionCell
+# from attention_cell import AttentionEncoderCell, DotAttentionCell
 
 parser = argparse.ArgumentParser(description="Train RNN on Penn Tree Bank",
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -35,7 +35,7 @@ parser.add_argument('--num-hidden', type=int, default=200,
                     help='hidden layer size')
 parser.add_argument('--num-embed', type=int, default=200,
                     help='embedding layer size')
-parser.add_argument('--bidirectional', type=bool, default=False,
+parser.add_argument('--bidirectional', action='store_true',
                     help='whether to use bidirectional layers')
 parser.add_argument('--gpus', type=str,
                     help='list of gpus to run, e.g. 0 or 0,2,5. empty means using cpu. ' \
@@ -58,6 +58,7 @@ parser.add_argument('--disp-batches', type=int, default=50,
                     help='show progress for every n batches')
 parser.add_argument('--max-grad-norm', type=float, default=5.0,
                     help='maximum gradient norm (larger values will be clipped')
+
 # When training a deep, complex model, it's recommended to stack fused RNN cells (one
 # layer per cell) together instead of one with all layers. The reason is that fused RNN
 # cells doesn't set gradients to be ready until the computation for the entire layer is
@@ -75,6 +76,16 @@ parser.add_argument('--inference-unrolling-for-training', action='store_true',
                     help='Feed previous prediction (instead of previous ground truth) into the decoder input during training')
 parser.add_argument('--seed', type=int, default=1234,
                     help='Set random seed for Python, NumPy and MxNet RNGs')
+
+parser.add_argument('--remove-state-feed', action='store_true',
+                    help='Remove direct state feeding from encoder to decoder (use when using attention)')
+
+
+parser.add_argument('--input-feed', action='store_true',
+                    help='Enable input feed (attention is fed into the decoder as input, rather than concatenated with output)')
+
+parser.add_argument('--attention', action='store_true',
+                    help='Use attention (dot attention is the currently implemented form')
 
 #buckets = [32]
 # buckets = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
@@ -183,45 +194,121 @@ def get_data(layout, infer=False):
     else:
         return test_iter, test_iter.src_vocab, test_iter.inv_src_vocab, test_iter.targ_vocab, test_iter.inv_targ_vocab
 
-# WORK IN PROGRESS !!!
-def decoder_unroll(decoder, target_embed, targ_vocab, unroll_length,
-                  go_symbol,
-                  fc_weight, fc_bias, targ_em_weight,
+def attention_step(i, encoder_outputs, decoder_output):
+
+    attention_state = mx.sym.zeros_like(encoder_outputs[-1], name='train_dec_unroll_attention_state')
+    curr_att_input = mx.sym.expand_dims(decoder_output, axis=2, name='train_dec_unroll_expand_dims_%d_' % i)
+    enc_len = len(encoder_outputs)
+    dots = []
+    concat_dots = None
+    # loop over all the encoder periods to create weights for weighted state
+    for j in range(enc_len):
+        transposed = mx.sym.expand_dims(encoder_outputs[j], axis=2)
+        transposed = mx.sym.transpose(transposed, axes=(0, 2, 1), name='train_decoder_transpose%d_' % i)
+        dot = mx.sym.batch_dot(transposed, curr_att_input, name='train_decoder_batch_dot_%d_%d_' % (i, j))
+        dot = mx.sym.exp(dot, name='train_decoder_exp_%d_%d' % (i, j))
+        # The batch size shouldn't be an arg here anyway. We should just remove extra dimensions
+        # and then transpose.
+        dot = mx.sym.reshape(dot, shape=(1, args.batch_size / len(contexts)),
+                             name='train_decoder_unroll_reshape_%d_%d' % (i, j))
+        dots.append(dot)
+        if not concat_dots:
+            concat_dots = dot
+        else:
+            concat_dots = mx.sym.concat(concat_dots, dot)
+    dot_sum = mx.sym.sum(concat_dots, axis=1)
+    for j in range(enc_len):
+        curr_dot = mx.sym.transpose(dots[j])
+        attention_state += mx.sym.broadcast_mul(curr_dot, encoder_outputs[j],
+                                                name='train_encoder_acc_attention_%d_%d_' % (i, j))
+
+    attention_state = mx.sym.broadcast_div(attention_state, dot_sum)
+
+    return attention_state
+
+
+def train_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unroll_length,
+                         go_symbol, fc_weight, fc_bias, attention_fc_weight, attention_fc_bias, targ_em_weight,
+                        begin_state=None, layout='TNC', merge_outputs=None):
+    decoder.reset()
+    if begin_state is None:
+        begin_state = decoder.begin_state()
+    inputs, _ = _normalize_sequence(unroll_length, target_embed, layout, False)
+    # Need to use hidden state from attention model, but <GO> as input
+    states = begin_state
+    outputs = []
+
+    #At the first time step there is no previous attention
+    attention_state = None
+
+    for i in range(unroll_length):
+        if args.input_feed:
+            # Copy previous attention output to concatenate with the embedding input
+            prev_attention_state = attention_state if attention_state else mx.sym.zeros_like(encoder_outputs[-1], name='train_dec_unroll_prev_attention_state')
+            decoder_feed = mx.sym.concat(inputs[i], prev_attention_state, name = 'decoder_feed_concat_%d_' % i)
+        else:
+            decoder_feed = inputs[i]
+        dec_out, states = decoder(decoder_feed, states)
+
+        if args.attention:
+            # The attention receives as input all the encoder outputs and the current decoder output and return the vector
+            # for this time step
+            attention_state = attention_step(i, encoder_outputs, dec_out)
+            # The attention output is combined with the decoder output for computing the next word
+            concatenated = mx.sym.concat(dec_out, attention_state, name = 'train_decoder_concat_%d_' % i)
+            attention_fc = mx.sym.FullyConnected(
+                data=concatenated, weight=attention_fc_weight, bias=attention_fc_bias, num_hidden=args.num_hidden, name='attention_fc%d_' % i
+            )
+            curr_out = mx.sym.Activation(data = attention_fc, act_type='tanh', name = 'attention_tanh%d_' % i)
+        else:
+            # We avoid all the attention computation
+            curr_out = dec_out
+        outputs.append(curr_out)
+    outputs, _ = _normalize_sequence(unroll_length, outputs, layout, merge_outputs)
+    return outputs, states
+
+
+def infer_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unroll_length,
+                  go_symbol, fc_weight, fc_bias, attention_fc_weight, attention_fc_bias, targ_em_weight,
                   begin_state=None, layout='TNC', merge_outputs=None):
+    decoder.reset()
+    if begin_state is None:
+        begin_state = decoder.begin_state()
+    inputs, _ = _normalize_sequence(unroll_length, target_embed, layout, False)
+    # Need to use hidden state from attention model, but <GO> as input
+    states = begin_state
+    outputs = []
+    embed = inputs[0]
 
-        decoder.reset()
+    attention_state = None
 
-        if begin_state is None:
-            begin_state = decoder.begin_state()
+    for i in range(unroll_length):
+        if args.input_feed:
+            # Copy previous attention output to concatenate with the embedding input
+            prev_attention_state = attention_state if attention_state else mx.sym.zeros_like(encoder_outputs[-1],
+                                        name='train_dec_unroll_prev_attention_state')
+            decoder_feed = mx.sym.concat(embed, prev_attention_state, name='decoder_feed_concat_%d_' % i)
+        else:
+            decoder_feed = embed
+        dec_out, states = decoder(decoder_feed, states)
 
-        inputs, _ = _normalize_sequence(unroll_length, target_embed, layout, False)
+        # Should this be dec_out or states as the first argument?
+        if args.attention:
+            attention_state = attention_step(i, encoder_outputs, dec_out)
+            concatenated = mx.sym.concat(dec_out, attention_state, name = 'train_decoder_concat_%d_' % i)
+            attention_fc = mx.sym.FullyConnected(
+                data=concatenated, weight=attention_fc_weight, bias=attention_fc_bias, num_hidden=args.num_hidden, name='attention_fc%d_' % i
+            )
+            curr_out = mx.sym.Activation(data = attention_fc, act_type='tanh', name = 'attention_tanh%d_' % i)
+        else:
+            curr_out = dec_out
+        outputs.append(curr_out)
+        fc = mx.sym.FullyConnected(data=curr_out, weight=fc_weight, bias=fc_bias, num_hidden=len(targ_vocab), name='decoder_fc%d_'%i)
+        am = mx.sym.argmax(data=fc, axis=1)
+        embed = mx.sym.Embedding(data=am, weight=targ_em_weight, input_dim=len(targ_vocab), output_dim=args.num_embed, name='decoder_embed%d_'%i)
 
-        # Need to use hidden state from attention model, but <GO> as input
-        states = begin_state
-        outputs = []
-
-        embed = inputs[0]
-
-        # NEW 1
-#        fc_weight = mx.sym.Variable('fc_weight')
-#        fc_bias = mx.sym.Variable('fc_bias')
-#        targ_em_weight = mx.sym.Variable('targ_em_weight')
-        for i in range(0, unroll_length):
-            output, states = decoder(embed, states)
-            outputs.append(output)
-            fc = mx.sym.FullyConnected(data=output, weight=fc_weight, bias=fc_bias, num_hidden=len(targ_vocab), name='decoder_fc%d_'%i)
-            am = mx.sym.argmax(data=fc, axis=1)
-            embed = mx.sym.Embedding(data=am, weight=targ_em_weight, input_dim=len(targ_vocab),
-                output_dim=args.num_embed, name='decoder_embed%d_'%i)
-
-        # NEW 2
-#        for i in range(0, unroll_length):
-#            embed, states = decoder(embed, states)
-#            outputs.append(embed)
-
-        outputs, _ = _normalize_sequence(unroll_length, outputs, layout, merge_outputs)
-
-        return outputs, states
+    outputs, _ = _normalize_sequence(unroll_length, outputs, layout, merge_outputs)
+    return outputs, states
 
 def train(args):
 
@@ -229,6 +316,9 @@ def train(args):
 
     data_train, data_val, _, src_vocab, targ_vocab, inv_src_vocab, inv_targ_vocab = get_data('TN')
     print "len(src_vocab) len(targ_vocab)", len(src_vocab), len(targ_vocab)
+
+    attention_fc_weight = mx.sym.Variable('attention_fc_weight')
+    attention_fc_bias = mx.sym.Variable('attention_fc_bias')
 
     fc_weight = mx.sym.Variable('fc_weight')
     fc_bias = mx.sym.Variable('fc_bias')
@@ -241,10 +331,18 @@ def train(args):
             mode='lstm', prefix='lstm_encoder', bidirectional=args.bidirectional, get_next_state=True))
     else:
         for i in range(args.num_layers):
-            encoder.add(LSTMCell(args.num_hidden, prefix='rnn_encoder%d_' % i))
-            if i < args.num_layers - 1 and args.dropout > 0.0:
-                encoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_encoder%d_' % i))
-    encoder.add(AttentionEncoderCell())
+            if args.bidirectional:
+                encoder.add(
+                    BidirectionalCell(
+                        LSTMCell(args.num_hidden // 2, prefix='rnn_encoder_f%d_' % i),
+                        LSTMCell(args.num_hidden // 2, prefix='rnn_encoder_b%d_' % i)))
+                if i < args.num_layers - 1 and args.dropout > 0.0:
+                    encoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_encoder%d_' % i))
+            else:
+                encoder.add(
+                    LSTMCell(args.num_hidden, prefix='rnn_encoder%d_' % i))
+                if i < args.num_layers - 1 and args.dropout > 0.0:
+                    encoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_encoder%d_' % i))
 
     decoder = mx.rnn.SequentialRNNCell()
 
@@ -256,7 +354,6 @@ def train(args):
             decoder.add(LSTMCell(args.num_hidden, prefix=('rnn_decoder%d_' % i)))
             if i < args.num_layers - 1 and args.dropout > 0.0:
                 decoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_decoder%d_' % i))
-    decoder.add(DotAttentionCell())
 
     def sym_gen(seq_len):
         src_data = mx.sym.Variable('src_data')
@@ -274,14 +371,21 @@ def train(args):
         enc_seq_len, dec_seq_len = seq_len
 
         layout = 'TNC'
-        _, states = encoder.unroll(enc_seq_len, inputs=src_embed, layout=layout)
+        encoder_outputs, encoder_states = encoder.unroll(enc_seq_len, inputs=src_embed, layout=layout)
+
+        if args.remove_state_feed:
+            encoder_states = None
 
         # This should be based on EOS or max seq len for inference, but here we unroll to the target length
         # TODO: fix <GO> symbol
         if args.inference_unrolling_for_training:
-            outputs, _ = decoder_unroll(decoder, targ_embed, targ_vocab, dec_seq_len, 0, fc_weight, fc_bias, targ_em_weight, begin_state=states, layout='TNC', merge_outputs=True)
+            outputs, _ = infer_decoder_unroll(decoder, encoder_outputs, targ_embed, targ_vocab, dec_seq_len, 0, fc_weight, fc_bias,
+                             attention_fc_weight, attention_fc_bias, 
+                             targ_em_weight, begin_state=encoder_states, layout='TNC', merge_outputs=True)
         else:
-            outputs, _ = decoder.unroll(dec_seq_len, targ_embed, begin_state=states, layout=layout, merge_outputs=True)
+            outputs, _ = train_decoder_unroll(decoder, encoder_outputs, targ_embed, targ_vocab, dec_seq_len, 0, fc_weight, fc_bias,
+                             attention_fc_weight, attention_fc_bias, 
+                             targ_em_weight, begin_state=encoder_states, layout='TNC', merge_outputs=True)
 
         # NEW
         rs = mx.sym.Reshape(outputs, shape=(-1, args.num_hidden), name='sym_gen_reshape1')
@@ -399,6 +503,9 @@ def infer(args):
 
     print "len(src_vocab) len(targ_vocab)", len(src_vocab), len(targ_vocab)
 
+    attention_fc_weight = mx.sym.Variable('attention_fc_weight')
+    attention_fc_bias = mx.sym.Variable('attention_fc_bias')
+
     fc_weight = mx.sym.Variable('fc_weight')
     fc_bias = mx.sym.Variable('fc_bias')
     targ_em_weight = mx.sym.Variable('targ_embed_weight')
@@ -411,11 +518,18 @@ def infer(args):
         encoder = SequentialRNNCell()
 
         for i in range(args.num_layers):
-            encoder.add(LSTMCell(args.num_hidden, prefix='rnn_encoder%d_' % i))
-            if i < args.num_layers - 1 and args.dropout > 0.0:
-                encoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_encoder%d_' % i))
-
-    encoder.add(AttentionEncoderCell())
+            if args.bidirectional:
+                encoder.add(
+                    BidirectionalCell(
+                        LSTMCell(args.num_hidden // 2, prefix='rnn_encoder_f%d_' % i),
+                        LSTMCell(args.num_hidden // 2, prefix='rnn_encoder_b%d_' % i)))
+                if i < args.num_layers - 1 and args.dropout > 0.0:
+                    encoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_encoder%d_' % i))
+            else:
+                encoder.add(
+                    LSTMCell(args.num_hidden, prefix='rnn_encoder%d_' % i))
+                if i < args.num_layers - 1 and args.dropout > 0.0:
+                    encoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_encoder%d_' % i))
 
     if args.use_cudnn_cells:
         decoder = mx.rnn.FusedRNNCell(args.num_hidden, num_layers=args.num_layers, 
@@ -428,8 +542,6 @@ def infer(args):
             decoder.add(LSTMCell(args.num_hidden, prefix=('rnn_decoder%d_' % i)))
             if i < args.num_layers - 1 and args.dropout > 0.0:
                 decoder.add(mx.rnn.DropoutCell(args.dropout, prefix='rnn_decoder%d_' % i))
-
-    decoder.add(DotAttentionCell())
 
     def sym_gen(seq_len):
         src_data = mx.sym.Variable('src_data')
@@ -448,14 +560,16 @@ def infer(args):
         enc_seq_len, dec_seq_len = seq_len
 
         layout = 'TNC'
-        _, states = encoder.unroll(enc_seq_len, inputs=src_embed, layout=layout)
+        encoder_outputs, encoder_states = encoder.unroll(enc_seq_len, inputs=src_embed, layout=layout)
 
         # This should be based on EOS or max seq len for inference, but here we unroll to the target length
         # TODO: fix <GO> symbol
 #        outputs, _ = decoder.unroll(dec_seq_len, targ_embed, begin_state=states, layout=layout, merge_outputs=True)
-        outputs, _ = decoder_unroll(decoder, targ_embed, targ_vocab, dec_seq_len, 0, 
-                     fc_weight, fc_bias, targ_em_weight,
-                     begin_state=states, layout='TNC', merge_outputs=True)
+        outputs, _ = infer_decoder_unroll(decoder, encoder_outputs, targ_embed, targ_vocab, dec_seq_len, 0,
+                     fc_weight, fc_bias, 
+                     attention_fc_weight, attention_fc_bias,
+                     targ_em_weight,
+                     begin_state=encoder_states, layout='TNC', merge_outputs=True)
 
         # NEW
 
@@ -570,7 +684,6 @@ def infer(args):
         print("Source text: %s" % src_txt)
         print("Expected translation: %s" % exp_txt)
         print("Actual translation: %s" % act_txt)
-    print("\n")
     print("\nTest set BLEU score (averaged over all examples): %.3f\n" % bleu_acc)
 
 if __name__ == '__main__':
@@ -579,6 +692,9 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG, format=head)
 
     args = parser.parse_args()
+
+    if args.input_feed:
+        assert (args.attention == True), "--input-feed is legal only with --attention!"
 
     # set random seeds for Python, NumPy and MxNet
     import random
