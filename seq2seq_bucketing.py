@@ -205,17 +205,19 @@ def train_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unr
         # Need to use hidden state from attention model, but <GO> as input
         states = begin_state
         outputs = []
-        attention_state = mx.sym.zeros_like(encoder_outputs[-1], name='train_dec_unroll_attention_state')
         enc_len = len(encoder_outputs)
+	attention_state = None
         for i in range(unroll_length):
-            if i == 0:
-#                if args.remove_state_feed:
-                curr_att_input = mx.sym.zeros_like(states[-1])
-#                else:
-#                curr_att_input = states[-1]
+            if args.input_feed:
+                prev_attention_state = attention_state if attention_state else mx.sym.zeros_like(encoder_outputs[-1], name='train_dec_unroll_prev_attention_state')
+	    attention_state = mx.sym.zeros_like(encoder_outputs[-1], name='train_dec_unroll_attention_state')
+	    if args.input_feed:
+                decoder_feed = mx.sym.concat(inputs[i], prev_attention_state, name = 'decoder_feed_concat_%d_' % i)
             else:
-                curr_att_input = curr_out
-            curr_att_input = mx.sym.expand_dims(curr_att_input, axis=2, name='train_dec_unroll_expand_dims_%d_' % i)
+                decoder_feed = inputs[i]
+            dec_out, states = decoder(decoder_feed, states)
+
+            curr_att_input = mx.sym.expand_dims(dec_out, axis=2, name='train_dec_unroll_expand_dims_%d_' % i)
 
             dots = []
             concat_dots = None
@@ -239,13 +241,6 @@ def train_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unr
                 attention_state += mx.sym.broadcast_mul(curr_dot, encoder_outputs[j], name='train_encoder_acc_attention_%d_%d_' % (i, j))
 
             attention_state = mx.sym.broadcast_div(attention_state, dot_sum)
-            if args.input_feed:
-                if i == 0:
-                    curr_out = mx.sym.zeros_like(inputs[0])
-                decoder_feed = mx.sym.concat(inputs[i], curr_out, name = 'decoder_feed_concat_%d_' % i)
-            else:
-                decoder_feed = inputs[i]
-            dec_out, states = decoder(decoder_feed, states)
             if args.attention:
                 # Should this be dec_out or states as the first argument? 
                 concatenated = mx.sym.concat(dec_out, attention_state, name = 'train_decoder_concat_%d_' % i)
