@@ -240,6 +240,7 @@ def train_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unr
 
     #At the first time step there is no previous attention
     attention_state = None
+    dec_out = None
 
     for i in range(unroll_length):
         if args.input_feed:
@@ -248,12 +249,14 @@ def train_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unr
             decoder_feed = mx.sym.concat(inputs[i], prev_attention_state, name = 'decoder_feed_concat_%d_' % i)
         else:
             decoder_feed = inputs[i]
+
+        prev_dec_out = dec_out if dec_out else mx.sym.zeros_like(encoder_outputs[-1], name='train_dec_unroll_prev_dec_out') # begin_state
         dec_out, states = decoder(decoder_feed, states)
 
         if args.attention:
             # The attention receives as input all the encoder outputs and the current decoder output and return the vector
             # for this time step
-            attention_state = attention_step(i, encoder_outputs, dec_out)
+            attention_state = attention_step(i, encoder_outputs, prev_dec_out)
             # The attention output is combined with the decoder output for computing the next word
             concatenated = mx.sym.concat(dec_out, attention_state, name = 'train_decoder_concat_%d_' % i)
             attention_fc = mx.sym.FullyConnected(
