@@ -250,13 +250,13 @@ def train_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unr
         else:
             decoder_feed = inputs[i]
 
-        prev_dec_out = dec_out if dec_out else mx.sym.zeros_like(encoder_outputs[-1], name='train_dec_unroll_prev_dec_out') # begin_state
+#        prev_dec_out = dec_out if dec_out else mx.sym.zeros_like(encoder_outputs[-1], name='train_dec_unroll_prev_dec_out') # begin_state
         dec_out, states = decoder(decoder_feed, states)
 
         if args.attention:
             # The attention receives as input all the encoder outputs and the current decoder output and return the vector
             # for this time step
-            attention_state = attention_step(i, encoder_outputs, prev_dec_out)
+            attention_state = attention_step(i, encoder_outputs, dec_out)
             # The attention output is combined with the decoder output for computing the next word
             concatenated = mx.sym.concat(dec_out, attention_state, name = 'train_decoder_concat_%d_' % i)
             attention_fc = mx.sym.FullyConnected(
@@ -267,7 +267,14 @@ def train_decoder_unroll(decoder, encoder_outputs, target_embed, targ_vocab, unr
             # We avoid all the attention computation
             curr_out = dec_out
         outputs.append(curr_out)
+
+#    if unroll_length > 1:
+#        node = outputs[-1]
+#        arg_shapes, aux_shapes, out_shapes = node.infer_shape_partial()
+#        print_inferred_shapes(node, arg_shapes, aux_shapes, out_shapes)
+
     outputs, _ = _normalize_sequence(unroll_length, outputs, layout, merge_outputs)
+
     return outputs, states
 
 
@@ -381,14 +388,16 @@ def train(args):
 
         # This should be based on EOS or max seq len for inference, but here we unroll to the target length
         # TODO: fix <GO> symbol
-        if args.inference_unrolling_for_training:
-            outputs, _ = infer_decoder_unroll(decoder, encoder_outputs, targ_embed, targ_vocab, dec_seq_len, 0, fc_weight, fc_bias,
-                             attention_fc_weight, attention_fc_bias, 
-                             targ_em_weight, begin_state=encoder_states, layout='TNC', merge_outputs=True)
-        else:
-            outputs, _ = train_decoder_unroll(decoder, encoder_outputs, targ_embed, targ_vocab, dec_seq_len, 0, fc_weight, fc_bias,
-                             attention_fc_weight, attention_fc_bias, 
-                             targ_em_weight, begin_state=encoder_states, layout='TNC', merge_outputs=True)
+
+        outputs, _ = decoder.unroll(dec_seq_len, inputs=targ_embed, layout=layout, begin_state=encoder_states)
+#        if args.inference_unrolling_for_training:
+#            outputs, _ = infer_decoder_unroll(decoder, encoder_outputs, targ_embed, targ_vocab, dec_seq_len, 0, fc_weight, fc_bias,
+#                             attention_fc_weight, attention_fc_bias, 
+#                             targ_em_weight, begin_state=encoder_states, layout='TNC', merge_outputs=True)
+#        else:
+#            outputs, _ = train_decoder_unroll(decoder, encoder_outputs, targ_embed, targ_vocab, dec_seq_len, 0, fc_weight, fc_bias,
+#                             attention_fc_weight, attention_fc_bias, 
+#                             targ_em_weight, begin_state=encoder_states, layout='TNC', merge_outputs=True)
 
         # NEW
         rs = mx.sym.Reshape(outputs, shape=(-1, args.num_hidden), name='sym_gen_reshape1')
