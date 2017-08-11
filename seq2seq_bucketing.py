@@ -376,6 +376,10 @@ def train(args):
         layout = 'TNC'
         encoder_outputs, encoder_states = encoder.unroll(enc_seq_len, inputs=src_embed, layout=layout)
 
+        if args.bidirectional:
+            encoder_states = [mx.sym.concat(encoder_states[0][0], encoder_states[0][1]),
+                              mx.sym.concat(encoder_states[0][1], encoder_states[1][1])]
+
         if args.remove_state_feed:
             encoder_states = None
 
@@ -564,6 +568,10 @@ def infer(args):
 
         layout = 'TNC'
         encoder_outputs, encoder_states = encoder.unroll(enc_seq_len, inputs=src_embed, layout=layout)
+
+        if args.bidirectional:
+            encoder_states = [mx.sym.concat(encoder_states[0][0], encoder_states[0][1]),
+                              mx.sym.concat(encoder_states[0][1], encoder_states[1][1])]
 
         # This should be based on EOS or max seq len for inference, but here we unroll to the target length
         # TODO: fix <GO> symbol
